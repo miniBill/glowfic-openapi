@@ -1,0 +1,11 @@
+{
+    "license": "BSD-3-Clause",
+    "scripts": {
+        "start": "elm-pages dev",
+        "gen": "bunx elm-pages run ~/src/wolfadex/elm-open-api-cli/cli/src/Cli.elm --effect-types dillonkearns/elm-pages ./glowfic-openapi.yaml"
+    },
+    "devDependencies": {
+        "elm-pages": "^3.0.25",
+        "elm-review": "^2.13.4"
+    }
+}

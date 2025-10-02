@@ -144,7 +144,9 @@ components:
                             type: string
                     required:
                         - id
-                section: {}
+                section:
+                    type: object
+                    nullable: true
                 authors:
                     type: array
                     items:
@@ -182,8 +184,8 @@ components:
                             type: string
                         keyword:
                             type: string
-        required:
-            - id
+            required:
+                - "id"
     requestBodies: {}
     securitySchemes:
         cookieAuth:
