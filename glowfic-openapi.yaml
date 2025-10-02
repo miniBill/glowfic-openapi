@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+    title: Glowfic API
+    description: The API for the Glowfic website
+    version: "1.0"
+servers:
+    - url: https://glowfic.com/api/v1
+externalDocs:
+    url: https://glowfic.com/docs/1.0.en.html
+tags:
+    - name: Subcontinuities
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/board_sections.en.html
+    - name: Continuities
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/boards.en.html
+    - name: Bookmarks
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/bookmarks.en.html
+    - name: Characters
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/characters.en.html
+    - name: Galleries
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/galleries.en.html
+    - name: Icons
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/icons.en.html
+    - name: Index Posts
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/index_posts.en.html
+    - name: Index Sections
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/index_sections.en.html
+    - name: Posts
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/posts.en.html
+    - name: Replies
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/replies.en.html
+    - name: Tags
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/tags.en.html
+    - name: Templates
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/templates.en.html
+    - name: Users
+      externalDocs:
+          url: https://glowfic.com/docs/1.0/users.en.html
+security:
+    - cookieAuth: []
+
+paths:
+    /board_sections/reorder:
+        post:
+            tags:
+                - Subcontinuities
+            description: Update the order of subcontinuities. This is an unstable feature, and may be moved or renamed; it should not be trusted.
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                ordered_section_ids:
+                                    type: array
+                                    items:
+                                        oneOf:
+                                            - type: integer
+                                            - type: string
+                required: true
+            responses:
+                "200":
+                    description: Successful operation
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    section_ids:
+                                        type: array
+                                        items:
+                                            type: integer
+                "401":
+                    description: You must be logged in
+                "403":
+                    description: Continuity is not editable by the user
+                "404":
+                    description: Section IDs could not be found
+                "422":
+                    description: Invalid parameters provided
+    /posts/{id}:
+        get:
+            tags:
+                - Posts
+            description: Load a single post as a JSON resource
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+            responses:
+                "200":
+                    description: Successful operation
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Post"
+
+components:
+    schemas:
+        Active:
+            type: string
+            enum:
+                - "active"
+        Post:
+            type: object
+            properties:
+                id:
+                    type: integer
+                subject:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                status:
+                    type: string
+                    enum:
+                        - active
+                section_order:
+                    type: integer
+                description:
+                    type: string
+                tagged_at:
+                    type: string
+                    format: date-time
+                board:
+                    type: object
+                    properties:
+                        id:
+                            type: integer
+                        name:
+                            type: string
+                    required:
+                        - id
+                section: {}
+                authors:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            id:
+                                type: integer
+                            username:
+                                type: string
+                num_replies:
+                    type: integer
+                content:
+                    type: string
+                character:
+                    type: object
+                    properties:
+                        id:
+                            type: integer
+                        name:
+                            type: string
+                        screenname:
+                            type: string
+                            nullable: true
+                    required:
+                        - id
+                        - name
+                        - screenname
+
+                icon:
+                    type: object
+                    properties:
+                        id:
+                            type: integer
+                        url:
+                            type: string
+                        keyword:
+                            type: string
+        required:
+            - id
+    requestBodies: {}
+    securitySchemes:
+        cookieAuth:
+            type: apiKey
+            in: cookie
+            name: "_glowfic_constellation_production"
