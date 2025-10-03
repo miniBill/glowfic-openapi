@@ -104,17 +104,28 @@ go token ids acc =
 
 getPost : { token : String } -> Int -> BackendTask FatalError ( Post, List Reply )
 getPost { token } id =
-    BackendTask.map2 Tuple.pair
-        (GlowficApi.Api.postsId
-            { authorization = { authorization = token }
-            , params = { id = id }
-            }
-        )
-        (GlowficApi.Api.postsIdReplies
-            { authorization = { authorization = token }
-            , params = { id = id }
-            }
-        )
+    GlowficApi.Api.postsId
+        { authorization = { authorization = token }
+        , params = { id = id }
+        }
+        |> BackendTask.andThen
+            (\post ->
+                List.range 0 ((post.num_replies - 1) // 100)
+                    |> List.map
+                        (\page ->
+                            GlowficApi.Api.postsIdReplies
+                                { authorization = { authorization = token }
+                                , params =
+                                    { id = id
+                                    , page = Just page
+                                    , per_page = Just 100
+                                    }
+                                }
+                        )
+                    |> BackendTask.combine
+                    |> BackendTask.map List.concat
+                    |> BackendTask.map (\replies -> ( post, replies ))
+            )
         |> BackendTask.allowFatal
 
 
@@ -178,7 +189,7 @@ viewPost post =
         , Html.Attributes.style "padding" "10px"
         , Html.Attributes.style "gap" "10px"
         ]
-        [ viewCharacter ("https://glowfic.com/posts/" ++ String.fromInt post.id)
+        [ viewCharacter
             { character = post.character
             , icon = post.icon
             , user =
@@ -189,7 +200,10 @@ viewPost post =
                         , username = ""
                         }
             }
-        , Html.p [ Html.Attributes.style "flex" "1 0" ] (viewContent post)
+        , Html.p [ Html.Attributes.style "flex" "1 0" ]
+            (viewPermalink ("https://glowfic.com/posts/" ++ String.fromInt post.id)
+                :: viewContent post
+            )
         ]
 
 
@@ -201,27 +215,43 @@ viewReply reply =
         , Html.Attributes.style "padding" "10px"
         , Html.Attributes.style "gap" "10px"
         ]
-        [ viewCharacter ("https://glowfic.com/replies/" ++ String.fromInt reply.id) reply
-        , Html.p [ Html.Attributes.style "flex" "1 0" ] (viewContent reply)
+        [ viewCharacter reply
+        , Html.p [ Html.Attributes.style "flex" "1 0" ]
+            (viewPermalink ("https://glowfic.com/replies/" ++ String.fromInt reply.id)
+                :: viewContent reply
+            )
+        ]
+
+
+viewPermalink : String -> Html msg
+viewPermalink url =
+    Html.a
+        [ Html.Attributes.href url
+        , Html.Attributes.style "padding" "4px 0 4px 4px"
+        , Html.Attributes.style "display" "block"
+        , Html.Attributes.style "float" "right"
+        ]
+        [ Html.img
+            [ Html.Attributes.src "https://dhtmoj33sf3e0.cloudfront.net/assets/icons/link-bb9df2e290558f33c20c21f4a2a85841eb4ccb1bd09f6266d3e80679f30ccf62.png" ]
+            []
         ]
 
 
 viewCharacter :
-    String
-    ->
-        { a
-            | icon : Maybe Icon
-            , character : Maybe Character
-            , user : User
-        }
+    { a
+        | icon : Maybe Icon
+        , character : Maybe Character
+        , user : User
+    }
     -> Html msg
-viewCharacter replyUrl reply =
+viewCharacter reply =
     Html.div
         [ Html.Attributes.style "display" "flex"
-        , Html.Attributes.style "align-items" "start"
+        , Html.Attributes.style "flex-direction" "column"
+        , Html.Attributes.class "character"
         ]
         [ viewPicture reply
-        , viewNames replyUrl reply
+        , viewNames reply
         ]
 
 
@@ -233,7 +263,9 @@ viewPicture { icon } =
                 [ Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
                 , Html.Attributes.style "padding" "10px"
                 , Html.Attributes.style "background" "#0e0b1e"
-                , Html.Attributes.style "display" "inline-flex"
+                , Html.Attributes.style "display" "flex"
+                , Html.Attributes.style "flex-direction" "column"
+                , Html.Attributes.style "align-items" "center"
                 ]
                 [ Html.img
                     [ Html.Attributes.src (Url.toString url)
@@ -246,8 +278,8 @@ viewPicture { icon } =
             Html.text ""
 
 
-viewNames : String -> { r | character : Maybe Character, user : User } -> Html msg
-viewNames replyUrl reply =
+viewNames : { r | character : Maybe Character, user : User } -> Html msg
+viewNames reply =
     Html.div
         [ Html.Attributes.style "font-weight" "700"
         ]
@@ -255,21 +287,14 @@ viewNames replyUrl reply =
         , Html.a
             [ Html.Attributes.href ("https://glowfic.com/users/" ++ String.fromInt reply.user.id)
             , Html.Attributes.style "padding" "2px 6px"
-            , Html.Attributes.style "display" "block"
             , Html.Attributes.style "background" "#0e0b1e"
+            , Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "flex-direction" "column"
+            , Html.Attributes.style "align-items" "center"
             ]
             [ Html.p
                 []
                 [ Html.text reply.user.username ]
-            ]
-        , Html.a
-            [ Html.Attributes.href replyUrl
-            , Html.Attributes.style "padding" "2px 6px"
-            , Html.Attributes.style "display" "block"
-            ]
-            [ Html.img
-                [ Html.Attributes.src "https://dhtmoj33sf3e0.cloudfront.net/assets/icons/link-bb9df2e290558f33c20c21f4a2a85841eb4ccb1bd09f6266d3e80679f30ccf62.png" ]
-                []
             ]
         ]
 
@@ -283,6 +308,9 @@ viewCharacterNames reply =
         Just character ->
             Html.div
                 [ Html.Attributes.style "background" "#111842"
+                , Html.Attributes.style "display" "flex"
+                , Html.Attributes.style "flex-direction" "column"
+                , Html.Attributes.style "align-items" "center"
                 ]
                 [ Html.a
                     [ Html.Attributes.href ("https://glowfic.com/characters/" ++ String.fromInt character.id)

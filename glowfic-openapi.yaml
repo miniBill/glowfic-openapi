@@ -156,6 +156,14 @@ paths:
                   required: true
                   schema:
                       type: integer
+                - name: page
+                  in: query
+                  schema:
+                      type: integer
+                - name: per_page
+                  in: query
+                  schema:
+                      type: integer
             responses:
                 200:
                     description: Successful operation
@@ -176,6 +184,15 @@ components:
             type: string
             enum:
                 - "active"
+        Board:
+            type: object
+            properties:
+                id:
+                    type: integer
+                name:
+                    type: string
+            required:
+                - id
 
         Character:
             type: object
@@ -226,14 +243,7 @@ components:
                     type: string
                     format: date-time
                 board:
-                    type: object
-                    properties:
-                        id:
-                            type: integer
-                        name:
-                            type: string
-                    required:
-                        - id
+                    $ref: "#/components/schemas/Board"
                 section:
                     type: object
                     nullable: true
@@ -253,6 +263,7 @@ components:
                 - id
                 - authors
                 - content
+                - num_replies
                 - subject
 
         Reply:

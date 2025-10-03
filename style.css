@@ -21,7 +21,16 @@ img {
     height: auto;
 }
 
-a {
+.character a,
+.character a:visited {
     color: inherit;
+}
+
+a {
+    color: #b5afcb;
     text-decoration: none;
+}
+
+a:visited {
+    color: #9c9aa4;
 }
