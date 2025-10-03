@@ -1,7 +1,7 @@
 module GlowficApi.Types exposing
     ( Post
     , Active(..), activeFromString, activeToString, activeVariants
-    , BoardSectionsReorder_Error(..)
+    , BoardSectionsReorder_Error(..), Login_Error(..)
     , Int_Or_String(..)
     )
 
@@ -20,7 +20,7 @@ module GlowficApi.Types exposing
 
 ## Errors
 
-@docs BoardSectionsReorder_Error
+@docs BoardSectionsReorder_Error, Login_Error
 
 
 ## One of
@@ -88,6 +88,13 @@ type BoardSectionsReorder_Error
     | BoardSectionsReorder_403 ()
     | BoardSectionsReorder_404 ()
     | BoardSectionsReorder_422 ()
+
+
+type Login_Error
+    = Login_401 ()
+    | Login_403 ()
+    | Login_404 ()
+    | Login_422 ()
 
 
 type Int_Or_String

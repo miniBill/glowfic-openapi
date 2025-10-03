@@ -48,9 +48,47 @@ tags:
       externalDocs:
           url: https://glowfic.com/docs/1.0/users.en.html
 security:
-    - cookieAuth: []
+    - tokenAuth: []
 
 paths:
+    /login:
+        post:
+            description: Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                username:
+                                    type: string
+                                password:
+                                    type: string
+                            required:
+                                - username
+                                - password
+                required: true
+            responses:
+                "200":
+                    description: Successful operation
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    token:
+                                        type: string
+                                required:
+                                    - token
+                "401":
+                    description: You must be logged in
+                "403":
+                    description: Continuity is not editable by the user
+                "404":
+                    description: Section IDs could not be found
+                "422":
+                    description: Invalid parameters provided
+            security: []
     /board_sections/reorder:
         post:
             tags:
@@ -188,7 +226,7 @@ components:
                 - "id"
     requestBodies: {}
     securitySchemes:
-        cookieAuth:
+        tokenAuth:
             type: apiKey
-            in: cookie
-            name: "_glowfic_constellation_production"
+            in: header
+            name: Authorization

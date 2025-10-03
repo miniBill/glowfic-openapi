@@ -1,9 +1,15 @@
 module GlowficApi.Api exposing
-    ( postsId
+    ( login
+    , postsId
     , boardSectionsReorder
     )
 
 {-|
+
+
+## Operations
+
+@docs login
 
 
 ## Posts
@@ -28,12 +34,45 @@ import OpenApi.Common
 import Url.Builder
 
 
+{-| Login
+-}
+login :
+    { body : { password : String, username : String } }
+    ->
+        BackendTask.BackendTask
+            { fatal : FatalError.FatalError
+            , recoverable : BackendTask.Http.Error
+            }
+            { token : String }
+login config =
+    BackendTask.Http.request
+        { url =
+            Url.Builder.crossOrigin "https://glowfic.com/api/v1" [ "login" ] []
+        , method = "POST"
+        , headers = []
+        , body =
+            BackendTask.Http.jsonBody
+                (Json.Encode.object
+                    [ ( "password", Json.Encode.string config.body.password )
+                    , ( "username", Json.Encode.string config.body.username )
+                    ]
+                )
+        , retries = Nothing
+        , timeoutInMs = Nothing
+        }
+        (BackendTask.Http.expectJson
+            (Json.Decode.succeed
+                (\token -> { token = token })
+                |> OpenApi.Common.jsonDecodeAndMap
+                    (Json.Decode.field "token" Json.Decode.string)
+            )
+        )
+
+
 {-| Load a single post as a JSON resource
 -}
 postsId :
-    { authorization : { glowfic_constellation_production : String }
-    , params : { id : Int }
-    }
+    { authorization : { authorization : String }, params : { id : Int } }
     ->
         BackendTask.BackendTask
             { fatal : FatalError.FatalError
@@ -48,11 +87,7 @@ postsId config =
                 [ "posts", String.fromInt config.params.id ]
                 []
         , method = "GET"
-        , headers =
-            [ ( "Cookie"
-              , "_glowfic_constellation_production=" ++ config.authorization.glowfic_constellation_production
-              )
-            ]
+        , headers = [ ( "Authorization", config.authorization.authorization ) ]
         , body = BackendTask.Http.emptyBody
         , retries = Nothing
         , timeoutInMs = Nothing
@@ -63,7 +98,7 @@ postsId config =
 {-| Update the order of subcontinuities. This is an unstable feature, and may be moved or renamed; it should not be trusted.
 -}
 boardSectionsReorder :
-    { authorization : { glowfic_constellation_production : String }
+    { authorization : { authorization : String }
     , body :
         { ordered_section_ids : Maybe (List GlowficApi.Types.Int_Or_String) }
     }
@@ -81,11 +116,7 @@ boardSectionsReorder config =
                 [ "board_sections", "reorder" ]
                 []
         , method = "POST"
-        , headers =
-            [ ( "Cookie"
-              , "_glowfic_constellation_production=" ++ config.authorization.glowfic_constellation_production
-              )
-            ]
+        , headers = [ ( "Authorization", config.authorization.authorization ) ]
         , body =
             BackendTask.Http.jsonBody
                 (Json.Encode.object

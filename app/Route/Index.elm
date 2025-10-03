@@ -66,13 +66,25 @@ head _ =
 
 data : BackendTask FatalError Data
 data =
-    Env.expect "COOKIE"
+    BackendTask.map2 Tuple.pair
+        (Env.expect "username")
+        (Env.expect "password")
         |> BackendTask.allowFatal
         |> BackendTask.andThen
-            (\cookie ->
+            (\( username, password ) ->
+                GlowficApi.Api.login
+                    { body =
+                        { username = username
+                        , password = password
+                        }
+                    }
+                    |> BackendTask.allowFatal
+            )
+        |> BackendTask.andThen
+            (\{ token } ->
                 GlowficApi.Api.postsId
                     { authorization =
-                        { glowfic_constellation_production = cookie
+                        { authorization = token
                         }
                     , params = { id = 47527 }
                     }
