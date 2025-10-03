@@ -14,7 +14,6 @@ import Html.Parser
 import Html.Parser.Util
 import List.Extra
 import Pages.Url
-import PagesMsg exposing (PagesMsg)
 import RouteBuilder exposing (App, StatelessRoute)
 import Url
 import UrlPath
