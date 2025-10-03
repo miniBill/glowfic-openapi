@@ -176,6 +176,34 @@ components:
             type: string
             enum:
                 - "active"
+
+        Character:
+            type: object
+            properties:
+                id:
+                    type: integer
+                name:
+                    type: string
+                screenname:
+                    type: string
+            required:
+                - id
+                - name
+        Icon:
+            type: object
+            properties:
+                id:
+                    type: integer
+                url:
+                    type: string
+                    format: uri
+                keyword:
+                    type: string
+            required:
+                - id
+                - url
+                - keyword
+
         Post:
             type: object
             properties:
@@ -212,44 +240,21 @@ components:
                 authors:
                     type: array
                     items:
-                        type: object
-                        properties:
-                            id:
-                                type: integer
-                            username:
-                                type: string
+                        $ref: "#/components/schemas/User"
                 num_replies:
                     type: integer
                 content:
                     type: string
                 character:
-                    type: object
-                    properties:
-                        id:
-                            type: integer
-                        name:
-                            type: string
-                        screenname:
-                            type: string
-                            nullable: true
-                    required:
-                        - id
-                        - name
-                        - screenname
-
+                    $ref: "#/components/schemas/Character"
                 icon:
-                    type: object
-                    properties:
-                        id:
-                            type: integer
-                        url:
-                            type: string
-                            format: url
-                        keyword:
-                            type: string
+                    $ref: "#/components/schemas/Icon"
             required:
-                - "id"
-                - "content"
+                - id
+                - authors
+                - content
+                - subject
+
         Reply:
             type: object
             properties:
@@ -266,32 +271,26 @@ components:
                 character_name:
                     type: string
                 character:
-                    type: object
-                    properties:
-                        id:
-                            type: integer
-                        name:
-                            type: string
-                        screenname:
-                            type: string
+                    $ref: "#/components/schemas/Character"
                 icon:
-                    type: object
-                    properties:
-                        id:
-                            type: integer
-                        url:
-                            type: string
-                            format: url
-                        keyword:
-                            type: string
-
+                    $ref: "#/components/schemas/Icon"
                 user:
-                    type: object
-                    properties:
-                        id:
-                            type: integer
-                        username:
-                            type: string
+                    $ref: "#/components/schemas/User"
+            required:
+                - id
+                - content
+                - user
+
+        User:
+            type: object
+            properties:
+                id:
+                    type: integer
+                username:
+                    type: string
+            required:
+                - id
+                - username
 
     requestBodies: {}
     securitySchemes:

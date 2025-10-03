@@ -3,12 +3,21 @@
   "workspaces": {
     "": {
       "devDependencies": {
+        "elm": "^0.19.1-6",
         "elm-pages": "^3.0.25",
         "elm-review": "^2.13.4",
       },
     },
   },
   "packages": {
+    "@elm_binaries/darwin_arm64": ["@elm_binaries/darwin_arm64@0.19.1-0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-mjbsH7BNHEAmoE2SCJFcfk5fIHwFIpxtSgnEAqMsVLpBUFoEtAeX+LQ+N0vSFJB3WAh73+QYx/xSluxxLcL6dA=="],
+
+    "@elm_binaries/darwin_x64": ["@elm_binaries/darwin_x64@0.19.1-0", "", { "os": "darwin", "cpu": "x64" }, "sha512-QGUtrZTPBzaxgi9al6nr+9313wrnUVHuijzUK39UsPS+pa+n6CmWyV/69sHZeX9qy6UfeugE0PzF3qcUiy2GDQ=="],
+
+    "@elm_binaries/linux_x64": ["@elm_binaries/linux_x64@0.19.1-0", "", { "os": "linux", "cpu": "x64" }, "sha512-T1ZrWVhg2kKAsi8caOd3vp/1A3e21VuCpSG63x8rDie50fHbCytTway9B8WHEdnBFv4mYWiA68dzGxYCiFmU2w=="],
+
+    "@elm_binaries/win32_x64": ["@elm_binaries/win32_x64@0.19.1-0", "", { "os": "win32", "cpu": "x64" }, "sha512-yDleiXqSE9EcqKtd9SkC/4RIW8I71YsXzMPL79ub2bBPHjWTcoyyeBbYjoOB9SxSlArJ74HaoBApzT6hY7Zobg=="],
+
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.10", "", { "os": "aix", "cpu": "ppc64" }, "sha512-0NFWnA+7l41irNuaSVlLfgNT12caWJVLzp5eAVhZ0z1qpxbockccEt3s+149rE64VUI3Ml2zt8Nv5JVc4QXTsw=="],
 
     "@esbuild/android-arm": ["@esbuild/android-arm@0.25.10", "", { "os": "android", "cpu": "arm" }, "sha512-dQAxF1dW1C3zpeCDc5KqIYuZ1tgAdRXNoZP7vkBIRtKZPYe2xVr/d3SkirklCHudW1B45tGiUlz2pUWDfbDD4w=="],
@@ -310,6 +319,8 @@
     "eastasianwidth": ["eastasianwidth@0.2.0", "", {}, "sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA=="],
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
+
+    "elm": ["elm@0.19.1-6", "", { "optionalDependencies": { "@elm_binaries/darwin_arm64": "0.19.1-0", "@elm_binaries/darwin_x64": "0.19.1-0", "@elm_binaries/linux_x64": "0.19.1-0", "@elm_binaries/win32_x64": "0.19.1-0" }, "bin": { "elm": "bin/elm" } }, "sha512-mKYyierHICPdMx/vhiIacdPmTPnh889gjHOZ75ZAoCxo3lZmSWbGP8HMw78wyctJH0HwvTmeKhlYSWboQNYPeQ=="],
 
     "elm-doc-preview": ["elm-doc-preview@6.0.1", "", { "dependencies": { "chalk": "^5.3.0", "chokidar": "^3.6.0", "commander": "^12.1.0", "cross-spawn": "^7.0.6", "express": "^4.21.2", "express-ws": "^5.0.2", "glob": "^11.0.0", "latest-version": "^9.0.0", "open": "^10.1.0", "serve-index": "^1.9.1", "serve-static": "^1.16.2", "tmp": "0.2.3", "ws": "^8.18.0" }, "bin": { "edp": "cli.js", "elm-doc-preview": "cli.js" } }, "sha512-G/xgVRKpbLuqliQmBINQFE6I0YAwqET2+SabiyXE47kaVChkhIz91HlZudUvCzTG/CV2ci7AERtAwYzQ4bjOKA=="],
 

@@ -5,6 +5,7 @@
         "gen": "bunx elm-pages run ~/src/wolfadex/elm-open-api-cli/cli/src/Cli.elm --effect-types dillonkearns/elm-pages ./glowfic-openapi.yaml"
     },
     "devDependencies": {
+        "elm": "^0.19.1-6",
         "elm-pages": "^3.0.25",
         "elm-review": "^2.13.4"
     }
