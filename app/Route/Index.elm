@@ -12,6 +12,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Parser
 import Html.Parser.Util
+import List.Extra
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
 import RouteBuilder exposing (App, StatelessRoute)
@@ -101,8 +102,21 @@ go token ids acc =
             BackendTask.succeed acc
 
         h :: t ->
-            getPost token h
-                |> BackendTask.andThen (\post -> go token t (Dict.insert h post acc))
+            case Dict.get h acc of
+                Just _ ->
+                    go token t acc
+
+                Nothing ->
+                    getPost token h
+                        |> BackendTask.andThen
+                            (\( post, replies ) ->
+                                let
+                                    newIds =
+                                        (post.content :: List.map .content replies)
+                                            |> List.filterMap findLink
+                                in
+                                go token (newIds ++ t) (Dict.insert h ( post, replies ) acc)
+                            )
 
 
 getPost : { token : String } -> Int -> BackendTask FatalError ( Post, List Reply )
@@ -170,8 +184,67 @@ viewThread posts id =
                                 [ Html.text description ]
                     ]
                     :: viewPost post
-                    :: List.map viewReply replies
+                    :: viewReplies posts replies
                 )
+
+
+viewReplies : Dict Int ( Post, List Reply ) -> List Reply -> List (Html msg)
+viewReplies posts replies =
+    case replies of
+        [] ->
+            []
+
+        h :: t ->
+            case findLink h.content of
+                Just id ->
+                    [ viewReply h
+                    , Html.div
+                        [ Html.Attributes.class "split" ]
+                        [ Html.div
+                            [ Html.Attributes.class "thread" ]
+                            (viewReplies posts t)
+                        , viewThread posts id
+                        ]
+                    ]
+
+                Nothing ->
+                    viewReply h :: viewReplies posts t
+
+
+findLink : String -> Maybe Int
+findLink content =
+    case Html.Parser.run content of
+        Ok nodes ->
+            List.Extra.findMap findPostLink nodes
+
+        Err _ ->
+            Nothing
+
+
+findPostLink : Html.Parser.Node -> Maybe Int
+findPostLink node =
+    case node of
+        Html.Parser.Element name attrs children ->
+            case name of
+                "a" ->
+                    List.Extra.findMap
+                        (\( attrName, attrValue ) ->
+                            if attrName == "href" && String.startsWith "https://glowfic.com/posts/" attrValue then
+                                String.toInt (String.dropLeft (String.length "https://glowfic.com/posts/") attrValue)
+
+                            else
+                                Nothing
+                        )
+                        attrs
+
+                _ ->
+                    List.Extra.findMap findPostLink children
+
+        Html.Parser.Text _ ->
+            Nothing
+
+        Html.Parser.Comment _ ->
+            Nothing
 
 
 viewPost : Post -> Html msg
