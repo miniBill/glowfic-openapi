@@ -1,7 +1,7 @@
 module GlowficApi.Types exposing
-    ( Post
+    ( Post, Reply
     , Active(..), activeFromString, activeToString, activeVariants
-    , BoardSectionsReorder_Error(..), Login_Error(..)
+    , BoardSectionsReorder_Error(..), Login_Error(..), PostsIdReplies_Error(..)
     , Int_Or_String(..)
     )
 
@@ -10,7 +10,7 @@ module GlowficApi.Types exposing
 
 ## Aliases
 
-@docs Post
+@docs Post, Reply
 
 
 ## Enum
@@ -20,7 +20,7 @@ module GlowficApi.Types exposing
 
 ## Errors
 
-@docs BoardSectionsReorder_Error, Login_Error
+@docs BoardSectionsReorder_Error, Login_Error, PostsIdReplies_Error
 
 
 ## One of
@@ -42,7 +42,7 @@ type alias Post =
             , name : String
             , screenname : OpenApi.Common.Nullable String
             }
-    , content : Maybe String
+    , content : String
     , created_at : Maybe Time.Posix
     , description : Maybe String
     , icon :
@@ -54,6 +54,20 @@ type alias Post =
     , status : Maybe Active
     , subject : Maybe String
     , tagged_at : Maybe Time.Posix
+    }
+
+
+type alias Reply =
+    { character :
+        Maybe { id : Maybe Int, name : Maybe String, screenname : Maybe String }
+    , character_name : Maybe String
+    , content : Maybe String
+    , created_at : Maybe Time.Posix
+    , icon :
+        Maybe { id : Maybe Int, keyword : Maybe String, url : Maybe String }
+    , id : Maybe Int
+    , updated_at : Maybe Time.Posix
+    , user : Maybe { id : Maybe Int, username : Maybe String }
     }
 
 
@@ -95,6 +109,11 @@ type Login_Error
     | Login_403 ()
     | Login_404 ()
     | Login_422 ()
+
+
+type PostsIdReplies_Error
+    = PostsIdReplies_403 ()
+    | PostsIdReplies_404 ()
 
 
 type Int_Or_String

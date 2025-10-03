@@ -1,6 +1,6 @@
 module GlowficApi.Json exposing
-    ( encodeActive, encodePost
-    , decodeActive, decodePost
+    ( encodeActive, encodePost, encodeReply
+    , decodeActive, decodePost, decodeReply
     )
 
 {-|
@@ -8,12 +8,12 @@ module GlowficApi.Json exposing
 
 ## Encoders
 
-@docs encodeActive, encodePost
+@docs encodeActive, encodePost, encodeReply
 
 
 ## Decoders
 
-@docs decodeActive, decodePost
+@docs decodeActive, decodePost, decodeReply
 
 -}
 
@@ -96,9 +96,7 @@ encodePost rec =
                     )
                 )
                 rec.character
-            , Maybe.map
-                (\mapUnpack -> ( "content", Json.Encode.string mapUnpack ))
-                rec.content
+            , Just ( "content", Json.Encode.string rec.content )
             , Maybe.map
                 (\mapUnpack ->
                     ( "created_at"
@@ -169,6 +167,119 @@ encodePost rec =
                     )
                 )
                 rec.tagged_at
+            ]
+        )
+
+
+encodeReply : GlowficApi.Types.Reply -> Json.Encode.Value
+encodeReply rec =
+    Json.Encode.object
+        (List.filterMap
+            Basics.identity
+            [ Maybe.map
+                (\mapUnpack ->
+                    ( "character"
+                    , Json.Encode.object
+                        (List.filterMap
+                            Basics.identity
+                            [ Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "id", Json.Encode.int mapUnpack0 )
+                                )
+                                mapUnpack.id
+                            , Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "name", Json.Encode.string mapUnpack0 )
+                                )
+                                mapUnpack.name
+                            , Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "screenname"
+                                    , Json.Encode.string mapUnpack0
+                                    )
+                                )
+                                mapUnpack.screenname
+                            ]
+                        )
+                    )
+                )
+                rec.character
+            , Maybe.map
+                (\mapUnpack ->
+                    ( "character_name", Json.Encode.string mapUnpack )
+                )
+                rec.character_name
+            , Maybe.map
+                (\mapUnpack -> ( "content", Json.Encode.string mapUnpack ))
+                rec.content
+            , Maybe.map
+                (\mapUnpack ->
+                    ( "created_at"
+                    , OpenApi.Common.encodeStringDateTime mapUnpack
+                    )
+                )
+                rec.created_at
+            , Maybe.map
+                (\mapUnpack ->
+                    ( "icon"
+                    , Json.Encode.object
+                        (List.filterMap
+                            Basics.identity
+                            [ Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "id", Json.Encode.int mapUnpack0 )
+                                )
+                                mapUnpack.id
+                            , Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "keyword"
+                                    , Json.Encode.string mapUnpack0
+                                    )
+                                )
+                                mapUnpack.keyword
+                            , Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "url", Json.Encode.string mapUnpack0 )
+                                )
+                                mapUnpack.url
+                            ]
+                        )
+                    )
+                )
+                rec.icon
+            , Maybe.map
+                (\mapUnpack -> ( "id", Json.Encode.int mapUnpack ))
+                rec.id
+            , Maybe.map
+                (\mapUnpack ->
+                    ( "updated_at"
+                    , OpenApi.Common.encodeStringDateTime mapUnpack
+                    )
+                )
+                rec.updated_at
+            , Maybe.map
+                (\mapUnpack ->
+                    ( "user"
+                    , Json.Encode.object
+                        (List.filterMap
+                            Basics.identity
+                            [ Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "id", Json.Encode.int mapUnpack0 )
+                                )
+                                mapUnpack.id
+                            , Maybe.map
+                                (\mapUnpack0 ->
+                                    ( "username"
+                                    , Json.Encode.string mapUnpack0
+                                    )
+                                )
+                                mapUnpack.username
+                            ]
+                        )
+                    )
+                )
+                rec.user
             ]
         )
 
@@ -290,7 +401,7 @@ decodePost =
                 )
             )
         |> OpenApi.Common.jsonDecodeAndMap
-            (OpenApi.Common.decodeOptionalField
+            (Json.Decode.field
                 "content"
                 Json.Decode.string
             )
@@ -377,4 +488,125 @@ decodePost =
             (OpenApi.Common.decodeOptionalField
                 "tagged_at"
                 OpenApi.Common.decodeStringDateTime
+            )
+
+
+decodeReply : Json.Decode.Decoder GlowficApi.Types.Reply
+decodeReply =
+    Json.Decode.succeed
+        (\character character_name content created_at icon id updated_at user ->
+            { character = character
+            , character_name = character_name
+            , content = content
+            , created_at = created_at
+            , icon = icon
+            , id = id
+            , updated_at = updated_at
+            , user = user
+            }
+        )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "character"
+                (Json.Decode.succeed
+                    (\id name screenname ->
+                        { id = id
+                        , name = name
+                        , screenname = screenname
+                        }
+                    )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "id"
+                            Json.Decode.int
+                        )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "name"
+                            Json.Decode.string
+                        )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "screenname"
+                            Json.Decode.string
+                        )
+                )
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "character_name"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "content"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "created_at"
+                OpenApi.Common.decodeStringDateTime
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "icon"
+                (Json.Decode.succeed
+                    (\id keyword url ->
+                        { id =
+                            id
+                        , keyword =
+                            keyword
+                        , url =
+                            url
+                        }
+                    )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "id"
+                            Json.Decode.int
+                        )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "keyword"
+                            Json.Decode.string
+                        )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "url"
+                            Json.Decode.string
+                        )
+                )
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "id"
+                Json.Decode.int
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "updated_at"
+                OpenApi.Common.decodeStringDateTime
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (OpenApi.Common.decodeOptionalField
+                "user"
+                (Json.Decode.succeed
+                    (\id username ->
+                        { id =
+                            id
+                        , username =
+                            username
+                        }
+                    )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "id"
+                            Json.Decode.int
+                        )
+                    |> OpenApi.Common.jsonDecodeAndMap
+                        (OpenApi.Common.decodeOptionalField
+                            "username"
+                            Json.Decode.string
+                        )
+                )
             )

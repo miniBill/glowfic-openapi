@@ -1,6 +1,7 @@
 module GlowficApi.Api exposing
     ( login
     , postsId
+    , postsIdReplies
     , boardSectionsReorder
     )
 
@@ -15,6 +16,11 @@ module GlowficApi.Api exposing
 ## Posts
 
 @docs postsId
+
+
+## Replies
+
+@docs postsIdReplies
 
 
 ## Subcontinuities
@@ -93,6 +99,34 @@ postsId config =
         , timeoutInMs = Nothing
         }
         (BackendTask.Http.expectJson GlowficApi.Json.decodePost)
+
+
+{-| Load all the replies for a given post as JSON resources
+-}
+postsIdReplies :
+    { authorization : { authorization : String }, params : { id : Int } }
+    ->
+        BackendTask.BackendTask
+            { fatal : FatalError.FatalError
+            , recoverable : BackendTask.Http.Error
+            }
+            (List GlowficApi.Types.Reply)
+postsIdReplies config =
+    BackendTask.Http.request
+        { url =
+            Url.Builder.crossOrigin
+                "https://glowfic.com/api/v1"
+                [ "posts", String.fromInt config.params.id, "replies" ]
+                []
+        , method = "GET"
+        , headers = [ ( "Authorization", config.authorization.authorization ) ]
+        , body = BackendTask.Http.emptyBody
+        , retries = Nothing
+        , timeoutInMs = Nothing
+        }
+        (BackendTask.Http.expectJson
+            (Json.Decode.list GlowficApi.Json.decodeReply)
+        )
 
 
 {-| Update the order of subcontinuities. This is an unstable feature, and may be moved or renamed; it should not be trusted.

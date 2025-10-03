@@ -145,6 +145,30 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/Post"
+    /posts/{id}/replies:
+        get:
+            tags:
+                - Replies
+            description: Load all the replies for a given post as JSON resources
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+            responses:
+                200:
+                    description: Successful operation
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/Reply"
+                "403":
+                    description: Post is not visible to the user
+                "404":
+                    description: Post not found
 
 components:
     schemas:
@@ -220,10 +244,55 @@ components:
                             type: integer
                         url:
                             type: string
+                            format: url
                         keyword:
                             type: string
             required:
                 - "id"
+                - "content"
+        Reply:
+            type: object
+            properties:
+                id:
+                    type: integer
+                content:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+                character_name:
+                    type: string
+                character:
+                    type: object
+                    properties:
+                        id:
+                            type: integer
+                        name:
+                            type: string
+                        screenname:
+                            type: string
+                icon:
+                    type: object
+                    properties:
+                        id:
+                            type: integer
+                        url:
+                            type: string
+                            format: url
+                        keyword:
+                            type: string
+
+                user:
+                    type: object
+                    properties:
+                        id:
+                            type: integer
+                        username:
+                            type: string
+
     requestBodies: {}
     securitySchemes:
         tokenAuth:

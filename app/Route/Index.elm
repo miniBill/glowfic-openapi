@@ -2,13 +2,15 @@ module Route.Index exposing (ActionData, Data, Model, Msg, route)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Env as Env
+import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Json
-import GlowficApi.Types exposing (Post)
+import GlowficApi.Types exposing (Post, Reply)
 import Head
 import Head.Seo as Seo
-import Html
+import Html exposing (Html)
+import Html.Attributes
 import Json.Encode
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
@@ -22,7 +24,7 @@ type alias ActionData =
 
 
 type alias Data =
-    Post
+    Dict Int ( Post, List Reply )
 
 
 type alias Model =
@@ -81,26 +83,72 @@ data =
                     |> BackendTask.allowFatal
             )
         |> BackendTask.andThen
-            (\{ token } ->
-                GlowficApi.Api.postsId
-                    { authorization =
-                        { authorization = token
-                        }
-                    , params = { id = 47527 }
-                    }
-                    |> BackendTask.allowFatal
+            (\token ->
+                go token [ 47527 ] Dict.empty
             )
 
 
-view : App Data ActionData {} -> Model -> View (PagesMsg ())
+go : { token : String } -> List Int -> Data -> BackendTask FatalError Data
+go token ids acc =
+    case ids of
+        [] ->
+            BackendTask.succeed acc
+
+        h :: t ->
+            getPost token h
+                |> BackendTask.andThen (\post -> go token t (Dict.insert h post acc))
+
+
+getPost : { token : String } -> Int -> BackendTask FatalError ( Post, List Reply )
+getPost { token } id =
+    BackendTask.map2 Tuple.pair
+        (GlowficApi.Api.postsId
+            { authorization = { authorization = token }
+            , params = { id = id }
+            }
+        )
+        (GlowficApi.Api.postsIdReplies
+            { authorization = { authorization = token }
+            , params = { id = id }
+            }
+        )
+        |> BackendTask.allowFatal
+
+
+view : App Data ActionData {} -> Model -> View (PagesMsg msg)
 view app _ =
     { title = "Chaser Six When?"
     , body =
-        [ Html.pre []
-            [ app.data
-                |> GlowficApi.Json.encodePost
-                |> Json.Encode.encode 4
-                |> Html.text
-            ]
-        ]
+        app.data
+            |> Dict.toList
+            |> List.map viewThread
     }
+
+
+viewThread : ( Int, ( Post, List Reply ) ) -> Html msg
+viewThread ( id, ( post, replies ) ) =
+    Html.div [ Html.Attributes.style "border" "1px solid black" ]
+        (Html.text ("Id: " ++ String.fromInt id)
+            :: viewPost post
+            :: List.map viewReply replies
+        )
+
+
+viewPost : Post -> Html msg
+viewPost post =
+    Html.pre [ Html.Attributes.style "border" "1px solid black" ]
+        [ post
+            |> GlowficApi.Json.encodePost
+            |> Json.Encode.encode 4
+            |> Html.text
+        ]
+
+
+viewReply : Reply -> Html msg
+viewReply reply =
+    Html.pre [ Html.Attributes.style "border" "1px solid black" ]
+        [ reply
+            |> GlowficApi.Json.encodeReply
+            |> Json.Encode.encode 4
+            |> Html.text
+        ]
