@@ -5,7 +5,6 @@ import BackendTask.Env as Env
 import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
-import GlowficApi.Json
 import GlowficApi.Types exposing (Character, Icon, Post, Reply, User)
 import Head
 import Head.Seo as Seo
@@ -13,7 +12,6 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Parser
 import Html.Parser.Util
-import Json.Encode
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
 import RouteBuilder exposing (App, StatelessRoute)
@@ -174,8 +172,7 @@ viewThread ( id, ( post, replies ) ) =
 viewPost : Post -> Html msg
 viewPost post =
     Html.div
-        [ Html.Attributes.class "reply"
-        ]
+        [ Html.Attributes.class "reply" ]
         [ viewCharacter
             { character = post.character
             , icon = post.icon
@@ -187,7 +184,8 @@ viewPost post =
                         , username = ""
                         }
             }
-        , Html.p [ Html.Attributes.class "content" ]
+        , Html.p
+            [ Html.Attributes.class "content" ]
             (viewPermalink ("https://glowfic.com/posts/" ++ String.fromInt post.id)
                 :: viewContent post
             )
@@ -197,10 +195,10 @@ viewPost post =
 viewReply : Reply -> Html msg
 viewReply reply =
     Html.div
-        [ Html.Attributes.class "reply"
-        ]
+        [ Html.Attributes.class "reply" ]
         [ viewCharacter reply
-        , Html.p [ Html.Attributes.class "content" ]
+        , Html.p
+            [ Html.Attributes.class "content" ]
             (viewPermalink ("https://glowfic.com/replies/" ++ String.fromInt reply.id)
                 :: viewContent reply
             )
@@ -228,8 +226,7 @@ viewCharacter :
     -> Html msg
 viewCharacter reply =
     Html.div
-        [ Html.Attributes.class "character"
-        ]
+        [ Html.Attributes.class "character" ]
         [ viewPicture reply
         , viewNames reply
         ]
@@ -243,9 +240,7 @@ viewPicture { icon } =
                 [ Html.Attributes.class "icon"
                 , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
                 ]
-                [ Html.img
-                    [ Html.Attributes.src (Url.toString url) ]
-                    []
+                [ Html.img [ Html.Attributes.src (Url.toString url) ] []
                 ]
 
         Nothing ->
@@ -262,9 +257,7 @@ viewNames reply =
             [ Html.Attributes.href ("https://glowfic.com/users/" ++ String.fromInt reply.user.id)
             , Html.Attributes.class "username"
             ]
-            [ Html.p
-                []
-                [ Html.text reply.user.username ]
+            [ Html.p [] [ Html.text reply.user.username ]
             ]
         ]
 
@@ -281,8 +274,7 @@ viewCharacterNames reply =
                 [ Html.a
                     [ Html.Attributes.href ("https://glowfic.com/characters/" ++ String.fromInt character.id)
                     ]
-                    [ Html.p [] [ Html.text character.name ]
-                    ]
+                    [ Html.p [] [ Html.text character.name ] ]
                 , case character.screenname of
                     Nothing ->
                         Html.text ""
