@@ -67,6 +67,11 @@ head _ =
         |> Seo.website
 
 
+rootPost : Int
+rootPost =
+    47527
+
+
 data : BackendTask FatalError Data
 data =
     BackendTask.map2 Tuple.pair
@@ -85,7 +90,7 @@ data =
             )
         |> BackendTask.andThen
             (\token ->
-                go token [ 47527 ] Dict.empty
+                go token [ rootPost ] Dict.empty
             )
 
 
@@ -131,15 +136,10 @@ view : App Data ActionData {} -> Model -> View (PagesMsg msg)
 view app _ =
     { title = "Chaser Six When?"
     , body =
-        app.data
-            |> Dict.toList
-            |> List.map viewThread
+        viewThread app.data 47527
+            |> List.singleton
             |> Html.div
-                [ Html.Attributes.style "display" "flex"
-                , Html.Attributes.style "flex-direction" "row"
-                , Html.Attributes.style "flex-wrap" "wrap"
-                , Html.Attributes.style "color" "#f3f3f3"
-                , Html.Attributes.style "gap" "10px"
+                [ Html.Attributes.style "color" "#f3f3f3"
                 , Html.Attributes.style "padding" "10px"
                 , Html.Attributes.style "background" "#211e2f"
                 ]
@@ -147,26 +147,31 @@ view app _ =
     }
 
 
-viewThread : ( Int, ( Post, List Reply ) ) -> Html msg
-viewThread ( id, ( post, replies ) ) =
-    Html.div
-        [ Html.Attributes.class "thread" ]
-        (Html.div []
-            [ Html.div
-                [ Html.Attributes.class "subject" ]
-                [ Html.text post.subject ]
-            , case post.description of
-                Nothing ->
-                    Html.text ""
+viewThread : Dict Int ( Post, List Reply ) -> Int -> Html msg
+viewThread posts id =
+    case Dict.get id posts of
+        Nothing ->
+            Html.text ("Post #" ++ String.fromInt id ++ " not found")
 
-                Just description ->
-                    Html.div
-                        [ Html.Attributes.class "description" ]
-                        [ Html.text description ]
-            ]
-            :: viewPost post
-            :: List.map viewReply replies
-        )
+        Just ( post, replies ) ->
+            Html.div
+                [ Html.Attributes.class "thread" ]
+                (Html.div []
+                    [ Html.div
+                        [ Html.Attributes.class "subject" ]
+                        [ Html.text post.subject ]
+                    , case post.description of
+                        Nothing ->
+                            Html.text ""
+
+                        Just description ->
+                            Html.div
+                                [ Html.Attributes.class "description" ]
+                                [ Html.text description ]
+                    ]
+                    :: viewPost post
+                    :: List.map viewReply replies
+                )
 
 
 viewPost : Post -> Html msg
