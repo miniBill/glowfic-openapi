@@ -152,18 +152,10 @@ view app _ =
 viewThread : ( Int, ( Post, List Reply ) ) -> Html msg
 viewThread ( id, ( post, replies ) ) =
     Html.div
-        [ Html.Attributes.style "display" "flex"
-        , Html.Attributes.style "flex-direction" "column"
-        , Html.Attributes.style "gap" "10px"
-        , Html.Attributes.style "background" "#131937"
-        ]
+        [ Html.Attributes.class "thread" ]
         (Html.div []
             [ Html.div
-                [ Html.Attributes.style "background" "#0e0b1e"
-                , Html.Attributes.style "color" "#9c9aa4"
-                , Html.Attributes.style "padding" "10px"
-                , Html.Attributes.style "font-size" "1.125rem"
-                ]
+                [ Html.Attributes.class "subject" ]
                 [ Html.text post.subject ]
             , case post.description of
                 Nothing ->
@@ -171,9 +163,7 @@ viewThread ( id, ( post, replies ) ) =
 
                 Just description ->
                     Html.div
-                        [ Html.Attributes.style "background" "#484357"
-                        , Html.Attributes.style "padding" "6px 10px"
-                        ]
+                        [ Html.Attributes.class "description" ]
                         [ Html.text description ]
             ]
             :: viewPost post
@@ -197,7 +187,7 @@ viewPost post =
                         , username = ""
                         }
             }
-        , Html.p [ Html.Attributes.style "flex" "1 0" ]
+        , Html.p [ Html.Attributes.class "content" ]
             (viewPermalink ("https://glowfic.com/posts/" ++ String.fromInt post.id)
                 :: viewContent post
             )
@@ -210,7 +200,7 @@ viewReply reply =
         [ Html.Attributes.class "reply"
         ]
         [ viewCharacter reply
-        , Html.p [ Html.Attributes.style "flex" "1 0" ]
+        , Html.p [ Html.Attributes.class "content" ]
             (viewPermalink ("https://glowfic.com/replies/" ++ String.fromInt reply.id)
                 :: viewContent reply
             )
@@ -221,9 +211,7 @@ viewPermalink : String -> Html msg
 viewPermalink url =
     Html.a
         [ Html.Attributes.href url
-        , Html.Attributes.style "padding" "4px 0 4px 4px"
-        , Html.Attributes.style "display" "block"
-        , Html.Attributes.style "float" "right"
+        , Html.Attributes.class "permalink"
         ]
         [ Html.img
             [ Html.Attributes.src "https://dhtmoj33sf3e0.cloudfront.net/assets/icons/link-bb9df2e290558f33c20c21f4a2a85841eb4ccb1bd09f6266d3e80679f30ccf62.png" ]
@@ -240,9 +228,7 @@ viewCharacter :
     -> Html msg
 viewCharacter reply =
     Html.div
-        [ Html.Attributes.style "display" "flex"
-        , Html.Attributes.style "flex-direction" "column"
-        , Html.Attributes.class "character"
+        [ Html.Attributes.class "character"
         ]
         [ viewPicture reply
         , viewNames reply
