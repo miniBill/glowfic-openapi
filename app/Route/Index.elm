@@ -1,4 +1,4 @@
-module Route.Index exposing (ActionData, Data, Model, Msg, route)
+module Route.Index exposing (ActionData, Data, Model, Msg, data, route, view)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Env as Env
@@ -146,7 +146,7 @@ getPost { token } id =
         |> BackendTask.allowFatal
 
 
-view : App Data ActionData {} -> Model -> View (PagesMsg msg)
+view : { app | data : Data } -> Model -> View msg
 view app _ =
     { title = "Chaser Six When?"
     , body =
@@ -304,7 +304,7 @@ viewPost post =
                         , username = ""
                         }
             }
-        , Html.p
+        , Html.div
             [ Html.Attributes.class "content" ]
             (viewPermalink ("https://glowfic.com/posts/" ++ String.fromInt post.id)
                 :: viewContent post
@@ -317,7 +317,7 @@ viewReply reply =
     Html.div
         [ Html.Attributes.class "reply" ]
         [ viewCharacter reply
-        , Html.p
+        , Html.div
             [ Html.Attributes.class "content" ]
             (viewPermalink ("https://glowfic.com/replies/" ++ String.fromInt reply.id)
                 :: viewContent reply
