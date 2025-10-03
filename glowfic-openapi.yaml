@@ -238,22 +238,7 @@ paths:
                       type: string
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            required:
-                                - reply_id
-                            type: object
-                            properties:
-                                reply_id:
-                                    type: integer
-                                    description: Reply ID
-                                name:
-                                    type: string
-                                    description: New bookmark's name
-                                public:
-                                    type: boolean
-                                    description: New bookmark's public status
-                    multipart/form-data:
+                    application/json:
                         schema:
                             required:
                                 - reply_id
@@ -338,17 +323,7 @@ paths:
                       type: string
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            type: object
-                            properties:
-                                name:
-                                    type: string
-                                    description: Bookmark's new name
-                                public:
-                                    type: boolean
-                                    description: Bookmark's new public status
-                    multipart/form-data:
+                    application/json:
                         schema:
                             type: object
                             properties:
@@ -509,15 +484,7 @@ paths:
             operationId: post_characters_reorder
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            type: object
-                            properties:
-                                ordered_characters_gallery_ids:
-                                    type: array
-                                    items:
-                                        type: string
-                    multipart/form-data:
+                    application/json:
                         schema:
                             type: object
                             properties:
@@ -579,16 +546,7 @@ paths:
             operationId: post_icons_s3_delete
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            required:
-                                - s3_key
-                            type: object
-                            properties:
-                                s3_key:
-                                    type: string
-                                    description: S3 object key
-                    multipart/form-data:
+                    application/json:
                         schema:
                             required:
                                 - s3_key
@@ -621,17 +579,7 @@ paths:
             operationId: post_index_posts_reorder
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            type: object
-                            properties:
-                                ordered_post_ids:
-                                    type: array
-                                    items:
-                                        type: string
-                                section_id:
-                                    type: integer
-                    multipart/form-data:
+                    application/json:
                         schema:
                             type: object
                             properties:
@@ -667,15 +615,7 @@ paths:
             operationId: post_index_sections_reorder
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            type: object
-                            properties:
-                                ordered_section_ids:
-                                    type: array
-                                    items:
-                                        type: string
-                    multipart/form-data:
+                    application/json:
                         schema:
                             type: object
                             properties:
@@ -765,16 +705,7 @@ paths:
                       type: string
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            required:
-                                - private_note
-                            type: object
-                            properties:
-                                private_note:
-                                    type: string
-                                    description: Author's private notes about this post
-                    multipart/form-data:
+                    application/json:
                         schema:
                             required:
                                 - private_note
@@ -807,17 +738,7 @@ paths:
             operationId: post_posts_reorder
             requestBody:
                 content:
-                    application/x-www-form-urlencoded:
-                        schema:
-                            type: object
-                            properties:
-                                ordered_post_ids:
-                                    type: array
-                                    items:
-                                        type: string
-                                section_id:
-                                    type: integer
-                    multipart/form-data:
+                    application/json:
                         schema:
                             type: object
                             properties:
@@ -1119,6 +1040,7 @@ components:
             type: string
             enum:
                 - "active"
+
         Board:
             type: object
             properties:
@@ -1141,6 +1063,14 @@ components:
             required:
                 - id
                 - name
+
+        CharacterExtraFields:
+            type: string
+            enum:
+                - default_icon
+                - aliases
+                - nickname
+
         Icon:
             type: object
             properties:
