@@ -169,7 +169,9 @@ viewThread posts id =
 
         Just ( post, replies ) ->
             Html.div
-                [ Html.Attributes.class "thread" ]
+                [ Html.Attributes.class "thread"
+                , threadWidth posts replies
+                ]
                 (Html.div []
                     [ Html.div
                         [ Html.Attributes.class "subject" ]
@@ -188,6 +190,47 @@ viewThread posts id =
                 )
 
 
+threadWidth : Dict Int ( Post, List Reply ) -> List Reply -> Html.Attribute msg
+threadWidth posts replies =
+    let
+        l : Int
+        l =
+            Dict.size posts
+
+        p : Int
+        p =
+            parallels posts replies
+    in
+    Html.Attributes.style "width"
+        ("calc((100vw - 10px) / "
+            ++ String.fromInt l
+            ++ " * "
+            ++ String.fromInt p
+            ++ " - 10px"
+            ++ ")"
+        )
+
+
+parallels : Dict Int ( Post, List Reply ) -> List Reply -> Int
+parallels posts queue =
+    case queue of
+        [] ->
+            1
+
+        h :: t ->
+            case findLink h.content of
+                Nothing ->
+                    parallels posts t
+
+                Just id ->
+                    case Dict.get id posts of
+                        Nothing ->
+                            1 + parallels posts t
+
+                        Just ( _, replies ) ->
+                            parallels posts replies + parallels posts t
+
+
 viewReplies : Dict Int ( Post, List Reply ) -> List Reply -> List (Html msg)
 viewReplies posts replies =
     case replies of
@@ -200,7 +243,7 @@ viewReplies posts replies =
                     [ Html.div
                         [ Html.Attributes.class "split" ]
                         [ Html.div
-                            [ Html.Attributes.class "thread" ]
+                            [ Html.Attributes.class "thread", threadWidth posts t ]
                             (viewReply h :: viewReplies posts t)
                         , viewThread posts id
                         ]
