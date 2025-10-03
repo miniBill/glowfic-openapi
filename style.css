@@ -43,6 +43,7 @@ a:visited {
     display: flex;
     flex-direction: column;
     background: #131937;
+    container-type: inline-size;
 
     .subject {
         background: #0e0b1e;
@@ -69,12 +70,22 @@ a:visited {
             background-color: #25262e;
         }
 
+        @container (width < 600px) {
+            flex-direction: column;
+        }
+
         .character {
-            background-color: #0e0b1e;
             display: flex;
             flex-direction: column;
 
+            @container (280px < width < 600px) {
+                flex-direction: row;
+                align-items: start;
+                flex-wrap: nowrap;
+            }
+
             .icon {
+                background-color: #0e0b1e;
                 padding: 10px;
                 display: flex;
                 justify-content: center;
@@ -90,6 +101,7 @@ a:visited {
             }
 
             .names {
+                background-color: #0e0b1e;
                 font-weight: 700;
                 text-align: center;
 
