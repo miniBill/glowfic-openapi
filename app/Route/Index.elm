@@ -184,10 +184,7 @@ viewThread ( id, ( post, replies ) ) =
 viewPost : Post -> Html msg
 viewPost post =
     Html.div
-        [ Html.Attributes.style "background" "#31323b"
-        , Html.Attributes.style "display" "flex"
-        , Html.Attributes.style "padding" "10px"
-        , Html.Attributes.style "gap" "10px"
+        [ Html.Attributes.class "reply"
         ]
         [ viewCharacter
             { character = post.character
@@ -210,10 +207,7 @@ viewPost post =
 viewReply : Reply -> Html msg
 viewReply reply =
     Html.div
-        [ Html.Attributes.style "background" "#31323b"
-        , Html.Attributes.style "display" "flex"
-        , Html.Attributes.style "padding" "10px"
-        , Html.Attributes.style "gap" "10px"
+        [ Html.Attributes.class "reply"
         ]
         [ viewCharacter reply
         , Html.p [ Html.Attributes.style "flex" "1 0" ]
@@ -260,17 +254,11 @@ viewPicture { icon } =
     case icon of
         Just { id, url } ->
             Html.a
-                [ Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
-                , Html.Attributes.style "padding" "10px"
-                , Html.Attributes.style "background" "#0e0b1e"
-                , Html.Attributes.style "display" "flex"
-                , Html.Attributes.style "flex-direction" "column"
-                , Html.Attributes.style "align-items" "center"
+                [ Html.Attributes.class "icon"
+                , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
                 ]
                 [ Html.img
-                    [ Html.Attributes.src (Url.toString url)
-                    , Html.Attributes.style "width" "100px"
-                    ]
+                    [ Html.Attributes.src (Url.toString url) ]
                     []
                 ]
 
@@ -281,16 +269,12 @@ viewPicture { icon } =
 viewNames : { r | character : Maybe Character, user : User } -> Html msg
 viewNames reply =
     Html.div
-        [ Html.Attributes.style "font-weight" "700"
+        [ Html.Attributes.class "names"
         ]
         [ viewCharacterNames reply
         , Html.a
             [ Html.Attributes.href ("https://glowfic.com/users/" ++ String.fromInt reply.user.id)
-            , Html.Attributes.style "padding" "2px 6px"
-            , Html.Attributes.style "background" "#0e0b1e"
-            , Html.Attributes.style "display" "flex"
-            , Html.Attributes.style "flex-direction" "column"
-            , Html.Attributes.style "align-items" "center"
+            , Html.Attributes.class "username"
             ]
             [ Html.p
                 []
@@ -307,17 +291,11 @@ viewCharacterNames reply =
 
         Just character ->
             Html.div
-                [ Html.Attributes.style "background" "#111842"
-                , Html.Attributes.style "display" "flex"
-                , Html.Attributes.style "flex-direction" "column"
-                , Html.Attributes.style "align-items" "center"
-                ]
+                [ Html.Attributes.class "character-name" ]
                 [ Html.a
                     [ Html.Attributes.href ("https://glowfic.com/characters/" ++ String.fromInt character.id)
                     ]
-                    [ Html.p
-                        [ Html.Attributes.style "padding" "2px 6px" ]
-                        [ Html.text character.name ]
+                    [ Html.p [] [ Html.text character.name ]
                     ]
                 , case character.screenname of
                     Nothing ->
@@ -325,9 +303,7 @@ viewCharacterNames reply =
 
                     Just screenname ->
                         Html.p
-                            [ Html.Attributes.style "padding" "2px 6px"
-                            , Html.Attributes.style "color" "#9c9aa4"
-                            ]
+                            [ Html.Attributes.class "screenname" ]
                             [ Html.text screenname ]
                 ]
 
