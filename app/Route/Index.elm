@@ -197,12 +197,11 @@ viewReplies posts replies =
         h :: t ->
             case findLink h.content of
                 Just id ->
-                    [ viewReply h
-                    , Html.div
+                    [ Html.div
                         [ Html.Attributes.class "split" ]
                         [ Html.div
                             [ Html.Attributes.class "thread" ]
-                            (viewReplies posts t)
+                            (viewReply h :: viewReplies posts t)
                         , viewThread posts id
                         ]
                     ]
