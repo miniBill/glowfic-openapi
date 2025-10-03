@@ -78,6 +78,7 @@ a:visited {
         .character {
             display: flex;
             flex-direction: column;
+            align-self: flex-start;
 
             @container (280px < width < 600px) {
                 flex-direction: row;
