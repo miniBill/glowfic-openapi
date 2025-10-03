@@ -90,6 +90,7 @@ a:visited {
 
             .names {
                 font-weight: 700;
+                text-align: center;
 
                 p {
                     padding: 2px 6px;
@@ -116,6 +117,7 @@ a:visited {
 
         .content {
             flex: 1 0;
+            min-width: 200px;
 
             .permalink {
                 padding: 4px 0 4px 4px;
