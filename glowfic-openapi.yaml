@@ -166,7 +166,7 @@ paths:
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -186,7 +186,7 @@ paths:
                   description: Continuity ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -206,12 +206,12 @@ paths:
                   description: Continuity ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: page
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -245,7 +245,7 @@ paths:
                             type: object
                             properties:
                                 reply_id:
-                                    type: number
+                                    type: integer
                                     description: Reply ID
                                 name:
                                     type: string
@@ -260,7 +260,7 @@ paths:
                             type: object
                             properties:
                                 reply_id:
-                                    type: number
+                                    type: integer
                                     description: Reply ID
                                 name:
                                     type: string
@@ -294,7 +294,7 @@ paths:
                   description: Bookmark ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: Authorization
                   in: header
                   description: >-
@@ -327,7 +327,7 @@ paths:
                   description: Bookmark ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: Authorization
                   in: header
                   description: >-
@@ -392,28 +392,28 @@ paths:
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
                 - name: post_id
                   in: query
                   description: >-
                       If provided, will return only characters that appear in the provided
                       post
                   schema:
-                      type: number
+                      type: integer
                 - name: user_id
                   in: query
                   description: >-
                       If provided, will return only characters that belong to the provided
                       user
                   schema:
-                      type: number
+                      type: integer
                 - name: template_id
                   in: query
                   description: >-
                       If provided, will return only characters that belong to the provided
                       template. Use 0 to find only characters with no template.
                   schema:
-                      type: number
+                      type: integer
                 - name: includes
                   in: query
                   description: Specify additional fields to return in JSON
@@ -449,7 +449,7 @@ paths:
                   description: Character ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: post_id
                   in: query
                   description: >-
@@ -457,7 +457,7 @@ paths:
                       represent most recently used alias for this character in the
                       provided post
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -482,7 +482,7 @@ paths:
                   description: Character ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -553,12 +553,12 @@ paths:
                   description: Gallery ID. May pass 0 to represent icons without a gallery.
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: user_id
                   in: query
                   description: User ID required when accessing galleryless icons while logged out.
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -630,7 +630,7 @@ paths:
                                     items:
                                         type: string
                                 section_id:
-                                    type: number
+                                    type: integer
                     multipart/form-data:
                         schema:
                             type: object
@@ -640,7 +640,7 @@ paths:
                                     items:
                                         type: string
                                 section_id:
-                                    type: number
+                                    type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -754,7 +754,7 @@ paths:
                   description: Post ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: Authorization
                   in: header
                   description: >-
@@ -816,7 +816,7 @@ paths:
                                     items:
                                         type: string
                                 section_id:
-                                    type: number
+                                    type: integer
                     multipart/form-data:
                         schema:
                             type: object
@@ -826,7 +826,7 @@ paths:
                                     items:
                                         type: string
                                 section_id:
-                                    type: number
+                                    type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -894,13 +894,13 @@ paths:
                   description: Reply ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: user_id
                   in: query
                   description: User ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -943,19 +943,19 @@ paths:
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
                 - name: user_id
                   in: query
                   description: Filter GalleryGroups to the current user
                   schema:
-                      type: number
+                      type: integer
                 - name: tag_id
                   in: query
                   description: >-
                       Used for settings so we don't show the current setting as a possible
                       parent setting of itself
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -975,7 +975,7 @@ paths:
                   description: Tag ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -1001,12 +1001,12 @@ paths:
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
                 - name: user_id
                   in: query
                   description: ID of the template user (optional)
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -1039,17 +1039,14 @@ paths:
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
                 - name: hide_unblockable
                   in: query
                   description: >-
-                      If set to 'true', elimiates users who cannot be blocked from the
+                      If set to 'true', eliminates users who cannot be blocked from the
                       result
                   schema:
-                      type: string
-                      enum:
-                          - "true"
-                          - "false"
+                      type: boolean
             responses:
                 "200":
                     description: Successful operation
@@ -1069,12 +1066,12 @@ paths:
                   description: User ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: page
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -1094,17 +1091,17 @@ paths:
                   description: User ID
                   required: true
                   schema:
-                      type: number
+                      type: integer
                 - name: post_id
                   in: query
                   description: Post ID
                   schema:
-                      type: number
+                      type: integer
                 - name: page
                   in: query
                   description: Page in results (25 per page)
                   schema:
-                      type: number
+                      type: integer
             responses:
                 "200":
                     description: Successful operation
@@ -1240,6 +1237,14 @@ components:
             required:
                 - id
                 - username
+
+        TagType:
+            type: string
+            enum:
+                - Setting
+                - Label
+                - ContentWarning
+                - GalleryGroup
 
     requestBodies: {}
     securitySchemes:
