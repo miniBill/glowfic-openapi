@@ -1,4 +1,4 @@
-module Route.ChaserSixWhen exposing (ActionData, Data, Model, Msg, data, route, view)
+module Route.ChaserSixWhen exposing (ActionData, Data, Model, Msg, RouteParams, data, route, view)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Env as Env

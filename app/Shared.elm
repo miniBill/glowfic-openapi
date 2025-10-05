@@ -1,7 +1,7 @@
-module Shared exposing (..)
+module Shared exposing (Data, Model, Msg(..), SharedMsg, data, init, subscriptions, template, update, view)
 
 import BackendTask exposing (BackendTask)
-import Effect exposing (Effect(..))
+import Effect exposing (Effect)
 import FatalError exposing (FatalError)
 import Html exposing (Html)
 import Pages.Flags
