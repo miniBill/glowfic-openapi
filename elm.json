@@ -4,7 +4,8 @@
         ".elm-pages",
         "app",
         "src",
-        "generated"
+        "generated",
+        "script"
     ],
     "elm-version": "0.19.1",
     "dependencies": {

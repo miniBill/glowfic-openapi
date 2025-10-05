@@ -2,7 +2,8 @@
     "license": "BSD-3-Clause",
     "scripts": {
         "start": "elm-pages dev",
-        "build": "bun gen && elm-pages build",
+        "build": "bun run download && bun run gen && elm-pages build",
+        "download": "bunx elm-pages run ./script/DownloadLinks.elm",
         "gen": "bunx elm-pages run ~/src/wolfadex/elm-open-api-cli/cli/src/Cli.elm --effect-types dillonkearns/elm-pages ./glowfic-openapi.yaml"
     },
     "devDependencies": {
