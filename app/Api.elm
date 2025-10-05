@@ -7,6 +7,7 @@ import FatalError exposing (FatalError)
 import Html exposing (Html)
 import Route exposing (Route)
 import Route.ChaserSixWhen
+import View exposing (View)
 
 
 routes :
@@ -23,27 +24,37 @@ chaserSixWhen :
     -> ApiRoute ApiRoute.Response
 chaserSixWhen htmlToString =
     ApiRoute.succeed
-        (BackendTask.map2
-            (\data stylesheet ->
-                let
-                    inner =
-                        (Route.ChaserSixWhen.view
-                            { data = data }
-                            {}
-                        ).body
-                            |> List.map (htmlToString Nothing)
-                            |> String.concat
-                in
-                """<!DOCTYPE html>
+        (Route.ChaserSixWhen.data
+            |> BackendTask.map
+                (\data ->
+                    Route.ChaserSixWhen.view { data = data } {}
+                )
+            |> BackendTask.andThen (toHtmlPage htmlToString)
+        )
+        |> ApiRoute.literal "chaser-six-when"
+        |> ApiRoute.single
+
+
+toHtmlPage :
+    (Maybe { indent : Int, newLines : Bool } -> Html Never -> String)
+    -> View Never
+    -> BackendTask FatalError String
+toHtmlPage htmlToString view =
+    BackendTask.map
+        (\css ->
+            let
+                inner : String
+                inner =
+                    view.body
+                        |> List.map (htmlToString Nothing)
+                        |> String.concat
+            in
+            """<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>""" ++ stylesheet ++ """</style><title>Infinite Sea</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>""" ++ css ++ """</style><title>Infinite Sea</title></head>
 <body>
 """ ++ inner ++ """
 </body>
 </html>"""
-            )
-            Route.ChaserSixWhen.data
-            (File.rawFile "style.css" |> BackendTask.allowFatal)
         )
-        |> ApiRoute.literal "chaser-six-when"
-        |> ApiRoute.single
+        (File.rawFile "style.css" |> BackendTask.allowFatal)
