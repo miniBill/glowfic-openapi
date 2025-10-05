@@ -2,3 +2,4 @@ elm-stuff
 .elm-pages
 node_modules
 generated
+dist
