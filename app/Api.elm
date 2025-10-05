@@ -6,7 +6,7 @@ import BackendTask.File as File
 import FatalError exposing (FatalError)
 import Html exposing (Html)
 import Route exposing (Route)
-import Route.Index
+import Route.ChaserSixWhen
 
 
 routes :
@@ -14,19 +14,20 @@ routes :
     -> (Maybe { indent : Int, newLines : Bool } -> Html Never -> String)
     -> List (ApiRoute ApiRoute.Response)
 routes {- getStaticRoutes -} _ htmlToString =
-    [ result htmlToString ]
+    [ chaserSixWhen htmlToString
+    ]
 
 
-result :
+chaserSixWhen :
     (Maybe { indent : Int, newLines : Bool } -> Html Never -> String)
     -> ApiRoute ApiRoute.Response
-result htmlToString =
+chaserSixWhen htmlToString =
     ApiRoute.succeed
         (BackendTask.map2
             (\data stylesheet ->
                 let
                     inner =
-                        (Route.Index.view
+                        (Route.ChaserSixWhen.view
                             { data = data }
                             {}
                         ).body
@@ -41,8 +42,8 @@ result htmlToString =
 </body>
 </html>"""
             )
-            Route.Index.data
+            Route.ChaserSixWhen.data
             (File.rawFile "style.css" |> BackendTask.allowFatal)
         )
-        |> ApiRoute.literal "result"
+        |> ApiRoute.literal "chaser-six-when"
         |> ApiRoute.single

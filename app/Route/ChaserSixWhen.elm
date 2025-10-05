@@ -1,4 +1,4 @@
-module Route.Index exposing (ActionData, Data, Model, Msg, data, route, view)
+module Route.ChaserSixWhen exposing (ActionData, Data, Model, Msg, data, route, view)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Env as Env
@@ -120,7 +120,7 @@ go token ids acc =
 
 getPost : { token : String } -> Int -> BackendTask FatalError ( Post, List Reply )
 getPost { token } id =
-    GlowficApi.Api.postsId
+    GlowficApi.Api.getPostsId
         { authorization = { authorization = token }
         , params = { id = id }
         }
@@ -129,7 +129,7 @@ getPost { token } id =
                 List.range 0 ((post.num_replies - 1) // 100)
                     |> List.map
                         (\page ->
-                            GlowficApi.Api.postsIdReplies
+                            GlowficApi.Api.getPostsIdReplies
                                 { authorization = { authorization = token }
                                 , params =
                                     { id = id
