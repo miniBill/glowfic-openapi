@@ -660,7 +660,12 @@ paths:
             responses:
                 "200":
                     description: ok
-                    content: {}
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/PostSummary"
                     headers:
                         link:
                             description: Links to other pages
@@ -686,7 +691,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: "#/components/schemas/Post"
+                                $ref: "#/components/schemas/PostDetails"
                 "403":
                     description: Post is not visible to the user
                     content: {}
@@ -1098,7 +1103,23 @@ components:
                 - url
                 - keyword
 
-        Post:
+        PostDetails:
+            allOf:
+                - $ref: "#/components/schemas/PostSummary"
+                - type: object
+                  properties:
+                      content:
+                          type: string
+                      character:
+                          $ref: "#/components/schemas/Character"
+                      icon:
+                          $ref: "#/components/schemas/Icon"
+                  required:
+                      - content
+                      - character
+                      - icon
+
+        PostSummary:
             type: object
             properties:
                 id:
@@ -1111,6 +1132,7 @@ components:
                 status:
                     type: string
                     enum:
+                        - complete
                         - active
                 section_order:
                     type: integer
@@ -1130,18 +1152,18 @@ components:
                         $ref: "#/components/schemas/User"
                 num_replies:
                     type: integer
-                content:
-                    type: string
-                character:
-                    $ref: "#/components/schemas/Character"
-                icon:
-                    $ref: "#/components/schemas/Icon"
             required:
                 - id
-                - authors
-                - content
-                - num_replies
                 - subject
+                - description
+                - created_at
+                - tagged_at
+                - status
+                - section_order
+                - board
+                - section
+                - authors
+                - num_replies
 
         Reply:
             type: object
