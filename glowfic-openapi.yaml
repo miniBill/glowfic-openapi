@@ -168,13 +168,19 @@ paths:
                   schema:
                       type: integer
             responses:
-                "200":
+                200:
                     description: Successful operation
+                    headers:
+                        link:
+                            description: Links to other pages
+                            schema:
+                                type: string
+                                example: '<https://glowfic.com/api/v1/boards?page=362>; rel="last", <https://glowfic.com/api/v1/boards?page=2>; rel="next"'
                     content: {}
-                "422":
+                422:
                     description: Invalid parameters provided
                     content: {}
-    "/boards/{id}":
+    /boards/{id}:
         get:
             tags:
                 - Continuities
@@ -188,13 +194,13 @@ paths:
                   schema:
                       type: integer
             responses:
-                "200":
+                200:
                     description: Successful operation
                     content: {}
-                "404":
+                404:
                     description: Continuity not found
                     content: {}
-    "/boards/{id}/posts":
+    /boards/{id}/posts:
         get:
             tags:
                 - Continuities
@@ -213,10 +219,10 @@ paths:
                   schema:
                       type: integer
             responses:
-                "200":
+                200:
                     description: Successful operation
                     content: {}
-                "404":
+                404:
                     description: Continuity not found
                     content: {}
     /bookmarks:
@@ -267,7 +273,7 @@ paths:
                 "422":
                     description: Invalid parameters provided
                     content: {}
-    "/bookmarks/{id}":
+    /bookmarks/{id}:
         delete:
             tags:
                 - Bookmarks
@@ -412,7 +418,7 @@ paths:
                 "422":
                     description: Invalid parameters provided
                     content: {}
-    "/characters/{id}":
+    /characters/{id}:
         get:
             tags:
                 - Characters
@@ -508,7 +514,7 @@ paths:
                 "422":
                     description: Invalid parameters provided
                     content: {}
-    "/galleries/{id}":
+    /galleries/{id}:
         get:
             tags:
                 - Galleries
@@ -655,6 +661,12 @@ paths:
                 "200":
                     description: ok
                     content: {}
+                    headers:
+                        link:
+                            description: Links to other pages
+                            schema:
+                                type: string
+                                example: '<https://glowfic.com/api/v1/posts?page=362>; rel="last", <https://glowfic.com/api/v1/posts?page=2>; rel="next"'
     /posts/{id}:
         get:
             tags:
