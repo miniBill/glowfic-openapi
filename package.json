@@ -9,7 +9,7 @@
     "devDependencies": {
         "elm": "^0.19.1-6",
         "elm-optimize-level-2": "^0.3.5",
-        "elm-pages": "^3.0.25",
-        "elm-review": "^2.13.4"
+        "elm-pages": "^3.3.0",
+        "elm-review": "^2.13.5"
     }
 }
