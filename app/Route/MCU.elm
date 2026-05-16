@@ -20,7 +20,8 @@ import Pages.Url
 import PagesMsg exposing (PagesMsg)
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
-import SeqSet
+import SeqDict.Extra
+import SeqSet exposing (SeqSet)
 import Set
 import Url exposing (Url)
 import UrlPath
@@ -90,9 +91,11 @@ data =
     let
         charactersIds : List (Id Character)
         charactersIds =
-            allCharactersIds posts
+            List.concatMap (\p -> allCharactersIds p |> SeqDict.keys) posts
+                |> SeqSet.fromList
+                |> SeqSet.toList
     in
-    Do.each charactersIds (getCharacterIcon authorization) <| \charactersIcons ->
+    Do.each charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
     { charactersIcons =
         charactersIcons
             |> List.filterMap (\( f, s ) -> Maybe.map (Tuple.pair f) s)
@@ -119,14 +122,24 @@ getCharacterIcon authorization id =
         |> BackendTask.map (\icon -> ( id, icon ))
 
 
-allCharactersIds : List ( PostDetails, List Reply ) -> List (Id Character)
-allCharactersIds list =
-    list
-        |> List.concatMap (\( post, replies ) -> post.character :: List.map .character replies)
+allCharactersIds : ( PostDetails, List Reply ) -> SeqDict (Id Character) (SeqSet String)
+allCharactersIds ( post, replies ) =
+    (Maybe.map (\{ id, name } -> { id = id, name = name }) post.character
+        :: List.map
+            (\{ character, character_name } ->
+                Maybe.map
+                    (\{ id, name } ->
+                        { id = id
+                        , name = character_name |> Maybe.withDefault name
+                        }
+                    )
+                    character
+            )
+            replies
+    )
         |> Maybe.Extra.values
-        |> List.map (\{ id } -> Id id)
-        |> SeqSet.fromList
-        |> SeqSet.toList
+        |> List.map (\{ id, name } -> ( Id id, name ))
+        |> SeqDict.Extra.groupByWith Tuple.first Tuple.second
 
 
 view : App Data ActionData {} -> Model -> View msg
@@ -142,8 +155,9 @@ view app model =
                         , Html.Attributes.style "padding" "8px"
                         , Html.Attributes.style "display" "flex"
                         , Html.Attributes.style "flex-direction" "column"
+                        , Html.Attributes.style "max-width" "400px"
                         ]
-                        (viewPostSummary post replies)
+                        (viewPostSummary app.data post replies)
                 )
             |> Html.div
                 [ Html.Attributes.style "display" "flex"
@@ -155,33 +169,58 @@ view app model =
     }
 
 
-viewPostSummary : PostDetails -> List Reply -> List (Html msg)
-viewPostSummary post replies =
+viewPostSummary : Data -> PostDetails -> List Reply -> List (Html msg)
+viewPostSummary appData post replies =
     let
         name =
             post.subject
     in
-    [ Html.text name
-    , (post.icon
-        :: List.map
-            (\reply -> reply.icon)
-            replies
-      )
-        |> Maybe.Extra.values
-        |> List.Extra.uniqueBy .id
+    [ Html.a
+        [ Html.Attributes.href ("https://glowfic.com/posts/" ++ String.fromInt post.id)
+        ]
+        [ Html.text name ]
+    , allCharactersIds ( post, replies )
+        |> SeqDict.toList
         |> List.map
-            (\{ id, url } ->
-                Html.a
-                    [ Html.Attributes.class "icon"
-                    , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
-                    ]
-                    [ Html.img
-                        [ Html.Attributes.style "width" "auto"
-                        , Html.Attributes.style "height" "60px"
-                        , Html.Attributes.src (Url.toString url)
-                        ]
-                        []
-                    ]
+            (\( characterId, characterNames ) ->
+                let
+                    characterName : String
+                    characterName =
+                        characterNames
+                            |> SeqSet.toList
+                            |> String.join ", "
+
+                    _ =
+                        if String.contains ", " characterName then
+                            Debug.log "AA?" characterNames
+
+                        else
+                            characterNames
+                in
+                case SeqDict.get characterId appData.charactersIcons of
+                    Just { id, url } ->
+                        Html.a
+                            [ Html.Attributes.class "icon"
+                            , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt (Id.toInt id))
+                            , Html.Attributes.title characterName
+                            ]
+                            [ Html.img
+                                [ Html.Attributes.style "width" "auto"
+                                , Html.Attributes.style "height" "60px"
+                                , Html.Attributes.src (Url.toString url)
+                                ]
+                                []
+                            ]
+
+                    Nothing ->
+                        Html.div
+                            [ Html.Attributes.style "max-width" "90px"
+                            , Html.Attributes.style "width" "fit-content"
+                            , Html.Attributes.style "height" "60px"
+                            , Html.Attributes.style "border" "1px solid black"
+                            , Html.Attributes.style "padding" "4px"
+                            ]
+                            [ Html.text characterName ]
             )
         |> Html.div
             [ Html.Attributes.style "display" "flex"
