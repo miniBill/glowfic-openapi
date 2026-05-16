@@ -116,7 +116,10 @@ getCachedWithAuthorization { token } toTuple { params } =
     Do.do (File.exists ".elm-pages/http-response-cache/keep") <| \exists ->
     Do.allowFatal
         (if not exists then
-            Script.writeFile { path = ".elm-pages/http-response-cache/keep", body = "" }
+            Script.writeFile
+                { path = ".elm-pages/http-response-cache/keep"
+                , body = ""
+                }
 
          else
             BackendTask.succeed ()
