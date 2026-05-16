@@ -232,6 +232,13 @@ paths:
                                             $ref: "#/components/schemas/PostSummary"
                                 required:
                                     - results
+                    headers:
+                        link:
+                            description: Links to other pages
+                            schema:
+                                type: string
+                                example: '<https://glowfic.com/api/v1/boards/18/posts?page=3>; rel="last", <https://glowfic.com/api/v1/boards/18/posts?page=2>; rel="next"'
+                                pattern: '<https:\/\/glowfic\.com\/api\/v1\/boards\/(?:\d+)\/posts\?page=(?<last>\d+)>; rel="last", <https:\/\/glowfic\.com\/api\/v1\/boards\/(?:\d+)\/posts\?page=(?<next>\d+)>; rel="next"'
                 404:
                     description: Continuity not found
                     $ref: "#/components/responses/404"
