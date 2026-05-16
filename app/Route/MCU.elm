@@ -83,8 +83,8 @@ data =
                 }
             }
         )
-    <| \details ->
-    Do.each details (\{ id } -> GlowficApi.Extra.getPost token id) <| \posts ->
+    <| \{ results } ->
+    Do.each results (\{ id } -> GlowficApi.Extra.getPost token id) <| \posts ->
     posts
         |> List.map (\( p, r ) -> ( p.id, ( p, r ) ))
         |> Dict.fromList

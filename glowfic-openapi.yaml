@@ -224,9 +224,14 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: array
-                                items:
-                                    $ref: "#/components/schemas/PostSummary"
+                                type: object
+                                properties:
+                                    results:
+                                        type: array
+                                        items:
+                                            $ref: "#/components/schemas/PostSummary"
+                                required:
+                                    - results
                 404:
                     description: Continuity not found
                     $ref: "#/components/responses/404"
