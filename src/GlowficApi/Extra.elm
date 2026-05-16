@@ -113,10 +113,10 @@ getCachedWithAuthorization { token } toTuple { params } =
                 , params = params
                 }
     in
-    Do.do (File.exists ".cache/keep") <| \exists ->
+    Do.do (File.exists ".elm-pages/http-response-cache/keep") <| \exists ->
     Do.allowFatal
         (if not exists then
-            Script.writeFile { path = ".cache/keep", body = "" }
+            Script.writeFile { path = ".elm-pages/http-response-cache/keep", body = "" }
 
          else
             BackendTask.succeed ()
@@ -128,7 +128,7 @@ getCachedWithAuthorization { token } toTuple { params } =
         , retries = record.retries
         , timeoutInMs = record.timeoutInMs
         , headers = record.headers
-        , cachePath = Just ".cache"
+        , cachePath = Just ".elm-pages/http-response-cache"
         , cacheStrategy = Just Http.ForceCache
         }
         |> BackendTask.allowFatal
