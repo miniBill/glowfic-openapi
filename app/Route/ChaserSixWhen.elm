@@ -1,10 +1,12 @@
 module Route.ChaserSixWhen exposing (ActionData, Data, Model, Msg, RouteParams, data, route, view)
 
 import BackendTask exposing (BackendTask)
+import BackendTask.Do as Do
 import BackendTask.Env as Env
 import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
+import GlowficApi.Extra
 import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
 import Head
 import Head.Seo as Seo
@@ -18,6 +20,7 @@ import RouteBuilder exposing (App, StatelessRoute)
 import Url
 import UrlPath
 import View exposing (View)
+import View.Post
 
 
 type alias ActionData =
@@ -74,24 +77,8 @@ rootPost =
 
 data : BackendTask FatalError Data
 data =
-    BackendTask.map2 Tuple.pair
-        (Env.expect "username")
-        (Env.expect "password")
-        |> BackendTask.allowFatal
-        |> BackendTask.andThen
-            (\( username, password ) ->
-                GlowficApi.Api.login
-                    { body =
-                        { username = username
-                        , password = password
-                        }
-                    }
-                    |> BackendTask.allowFatal
-            )
-        |> BackendTask.andThen
-            (\token ->
-                go token [ rootPost ] Dict.empty
-            )
+    Do.do GlowficApi.Extra.login <| \token ->
+    go token [ rootPost ] Dict.empty
 
 
 go : { token : String } -> List Int -> Data -> BackendTask FatalError Data
@@ -149,7 +136,7 @@ view : { app | data : Data } -> Model -> View msg
 view app _ =
     { title = "Chaser Six When?"
     , body =
-        viewThread app.data 47527
+        viewThread app.data rootPost
             |> List.singleton
             |> Html.div
                 [ Html.Attributes.style "color" "#f3f3f3"
@@ -184,7 +171,7 @@ viewThread posts id =
                                 [ Html.Attributes.class "description" ]
                                 [ Html.text description ]
                     ]
-                    :: viewPost post
+                    :: View.Post.viewPost post
                     :: viewReplies posts replies
                 )
 
@@ -243,13 +230,13 @@ viewReplies posts replies =
                         [ Html.Attributes.class "split" ]
                         [ Html.div
                             [ Html.Attributes.class "thread", threadWidth posts t ]
-                            (viewReply h :: viewReplies posts t)
+                            (View.Post.viewReply h :: viewReplies posts t)
                         , viewThread posts id
                         ]
                     ]
 
                 Nothing ->
-                    viewReply h :: viewReplies posts t
+                    View.Post.viewReply h :: viewReplies posts t
 
 
 findLink : String -> Maybe Int
@@ -286,130 +273,3 @@ findPostLink node =
 
         Html.Parser.Comment _ ->
             Nothing
-
-
-viewPost : PostDetails -> Html msg
-viewPost post =
-    Html.div
-        [ Html.Attributes.class "reply" ]
-        [ viewCharacter
-            { character = post.character
-            , icon = post.icon
-            , user =
-                post.authors
-                    |> List.head
-                    |> Maybe.withDefault
-                        { id = -1
-                        , username = ""
-                        }
-            }
-        , Html.div
-            [ Html.Attributes.class "content" ]
-            (viewPermalink ("https://glowfic.com/posts/" ++ String.fromInt post.id)
-                :: viewContent post
-            )
-        ]
-
-
-viewReply : Reply -> Html msg
-viewReply reply =
-    Html.div
-        [ Html.Attributes.class "reply" ]
-        [ viewCharacter reply
-        , Html.div
-            [ Html.Attributes.class "content" ]
-            (viewPermalink ("https://glowfic.com/replies/" ++ String.fromInt reply.id)
-                :: viewContent reply
-            )
-        ]
-
-
-viewPermalink : String -> Html msg
-viewPermalink url =
-    Html.a
-        [ Html.Attributes.href url
-        , Html.Attributes.class "permalink"
-        ]
-        [ Html.img
-            [ Html.Attributes.src "https://dhtmoj33sf3e0.cloudfront.net/assets/icons/link-bb9df2e290558f33c20c21f4a2a85841eb4ccb1bd09f6266d3e80679f30ccf62.png" ]
-            []
-        ]
-
-
-viewCharacter :
-    { a
-        | icon : Maybe Icon
-        , character : Maybe Character
-        , user : User
-    }
-    -> Html msg
-viewCharacter reply =
-    Html.div
-        [ Html.Attributes.class "character" ]
-        [ viewPicture reply
-        , viewNames reply
-        ]
-
-
-viewPicture : { a | icon : Maybe Icon } -> Html msg
-viewPicture { icon } =
-    case icon of
-        Just { id, url } ->
-            Html.a
-                [ Html.Attributes.class "icon"
-                , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
-                ]
-                [ Html.img [ Html.Attributes.src (Url.toString url) ] []
-                ]
-
-        Nothing ->
-            Html.text ""
-
-
-viewNames : { r | character : Maybe Character, user : User } -> Html msg
-viewNames reply =
-    Html.div
-        [ Html.Attributes.class "names"
-        ]
-        [ viewCharacterNames reply
-        , Html.a
-            [ Html.Attributes.href ("https://glowfic.com/users/" ++ String.fromInt reply.user.id)
-            , Html.Attributes.class "username"
-            ]
-            [ Html.p [] [ Html.text reply.user.username ]
-            ]
-        ]
-
-
-viewCharacterNames : { r | character : Maybe Character } -> Html msg
-viewCharacterNames reply =
-    case reply.character of
-        Nothing ->
-            Html.text ""
-
-        Just character ->
-            Html.div
-                [ Html.Attributes.class "character-name" ]
-                [ Html.a
-                    [ Html.Attributes.href ("https://glowfic.com/characters/" ++ String.fromInt character.id)
-                    ]
-                    [ Html.p [] [ Html.text character.name ] ]
-                , case character.screenname of
-                    Nothing ->
-                        Html.text ""
-
-                    Just screenname ->
-                        Html.p
-                            [ Html.Attributes.class "screenname" ]
-                            [ Html.text screenname ]
-                ]
-
-
-viewContent : { a | content : String } -> List (Html msg)
-viewContent reply =
-    case Html.Parser.run reply.content of
-        Err _ ->
-            [ Html.text reply.content ]
-
-        Ok node ->
-            Html.Parser.Util.toVirtualDom node
