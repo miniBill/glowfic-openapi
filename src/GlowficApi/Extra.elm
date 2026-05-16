@@ -83,6 +83,15 @@ getCachedWithAuthorization { token } toTuple { params } =
                 , params = params
                 }
     in
+    Do.do (File.exists ".cache/keep") <| \exists ->
+    Do.allowFatal
+        (if not exists then
+            Script.writeFile { path = ".cache/keep", body = "" }
+
+         else
+            BackendTask.succeed ()
+        )
+    <| \_ ->
     Http.getWithOptions
         { url = record.url
         , expect = expect
