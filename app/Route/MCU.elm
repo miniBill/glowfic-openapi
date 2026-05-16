@@ -73,42 +73,12 @@ continuityId =
 data : BackendTask FatalError Data
 data =
     Do.do GlowficApi.Extra.login <| \token ->
-    Do.allowFatal
-        (getAllPosts token 1 [])
-    <| \results ->
+    Do.do (GlowficApi.Extra.getAllBoardsIdPosts token continuityId) <| \results ->
     Do.each results (\{ id } -> GlowficApi.Extra.getPost token id) <| \posts ->
     posts
         |> List.map (\( p, r ) -> ( p.id, ( p, r ) ))
         |> Dict.fromList
         |> BackendTask.succeed
-
-
-getAllPosts :
-    { token : String }
-    -> Int
-    -> List (List PostSummary)
-    -> BackendTask { fatal : FatalError, recoverable : Http.Error } (List PostSummary)
-getAllPosts token page acc =
-    GlowficApi.Api.getBoardsIdPosts
-        { authorization =
-            { authorization = token.token
-            }
-        , params =
-            { id = continuityId
-            , page = Just page
-            }
-        }
-        |> BackendTask.andThen
-            (\{ results } ->
-                if List.isEmpty results then
-                    acc
-                        |> List.reverse
-                        |> List.concat
-                        |> BackendTask.succeed
-
-                else
-                    getAllPosts token (page + 1) (results :: acc)
-            )
 
 
 view : App Data ActionData {} -> Model -> View (PagesMsg ())

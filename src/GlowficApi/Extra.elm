@@ -1,4 +1,4 @@
-module GlowficApi.Extra exposing (getPost, login)
+module GlowficApi.Extra exposing (getAllBoardsIdPosts, getPost, login)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
@@ -8,7 +8,7 @@ import BackendTask.Http as Http exposing (Body, Expect)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Json
-import GlowficApi.Types exposing (PostDetails, Reply)
+import GlowficApi.Types exposing (PostDetails, PostSummary, Reply)
 import Json.Decode
 import Pages.Script as Script
 import Triple.Extra exposing (from)
@@ -56,6 +56,36 @@ getPost authorization id =
                     |> BackendTask.map List.concat
                     |> BackendTask.map (\replies -> ( post, replies ))
             )
+
+
+getAllBoardsIdPosts :
+    { token : String }
+    -> Int
+    -> BackendTask FatalError (List PostSummary)
+getAllBoardsIdPosts authorization continuityId =
+    let
+        go : Int -> List (List PostSummary) -> BackendTask FatalError (List PostSummary)
+        go page acc =
+            getCachedWithAuthorization authorization
+                GlowficApi.Api.getBoardsIdPostsRecord
+                { params =
+                    { id = continuityId
+                    , page = Just page
+                    }
+                }
+                |> BackendTask.andThen
+                    (\{ results } ->
+                        if List.isEmpty results then
+                            acc
+                                |> List.reverse
+                                |> List.concat
+                                |> BackendTask.succeed
+
+                        else
+                            go (page + 1) (results :: acc)
+                    )
+    in
+    go 1 []
 
 
 getCachedWithAuthorization :
