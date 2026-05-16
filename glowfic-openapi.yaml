@@ -1116,8 +1116,8 @@ components:
                           $ref: "#/components/schemas/Icon"
                   required:
                       - content
-                      - character
-                      - icon
+                      #   - character
+                      #   - icon
 
         PostSummary:
             type: object

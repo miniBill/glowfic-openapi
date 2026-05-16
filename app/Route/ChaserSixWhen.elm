@@ -5,7 +5,7 @@ import BackendTask.Env as Env
 import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
-import GlowficApi.Types exposing (Character, Icon, Post, Reply, User)
+import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
 import Head
 import Head.Seo as Seo
 import Html exposing (Html)
@@ -25,7 +25,7 @@ type alias ActionData =
 
 
 type alias Data =
-    Dict Int ( Post, List Reply )
+    Dict Int ( PostDetails, List Reply )
 
 
 type alias Model =
@@ -118,7 +118,7 @@ go token ids acc =
                             )
 
 
-getPost : { token : String } -> Int -> BackendTask FatalError ( Post, List Reply )
+getPost : { token : String } -> Int -> BackendTask FatalError ( PostDetails, List Reply )
 getPost { token } id =
     GlowficApi.Api.getPostsId
         { authorization = { authorization = token }
@@ -160,7 +160,7 @@ view app _ =
     }
 
 
-viewThread : Dict Int ( Post, List Reply ) -> Int -> Html msg
+viewThread : Dict Int ( PostDetails, List Reply ) -> Int -> Html msg
 viewThread posts id =
     case Dict.get id posts of
         Nothing ->
@@ -176,10 +176,10 @@ viewThread posts id =
                         [ Html.Attributes.class "subject" ]
                         [ Html.text post.subject ]
                     , case post.description of
-                        Nothing ->
-                            Html.text ""
-
-                        Just description ->
+                        -- Nothing ->
+                        --     Html.text ""
+                        -- Just description ->
+                        description ->
                             Html.div
                                 [ Html.Attributes.class "description" ]
                                 [ Html.text description ]
@@ -189,7 +189,7 @@ viewThread posts id =
                 )
 
 
-threadWidth : Dict Int ( Post, List Reply ) -> List Reply -> Html.Attribute msg
+threadWidth : Dict Int ( PostDetails, List Reply ) -> List Reply -> Html.Attribute msg
 threadWidth posts replies =
     let
         l : Int
@@ -210,7 +210,7 @@ threadWidth posts replies =
         )
 
 
-parallels : Dict Int ( Post, List Reply ) -> List Reply -> Int
+parallels : Dict Int ( PostDetails, List Reply ) -> List Reply -> Int
 parallels posts queue =
     case queue of
         [] ->
@@ -230,7 +230,7 @@ parallels posts queue =
                             parallels posts replies + parallels posts t
 
 
-viewReplies : Dict Int ( Post, List Reply ) -> List Reply -> List (Html msg)
+viewReplies : Dict Int ( PostDetails, List Reply ) -> List Reply -> List (Html msg)
 viewReplies posts replies =
     case replies of
         [] ->
@@ -288,7 +288,7 @@ findPostLink node =
             Nothing
 
 
-viewPost : Post -> Html msg
+viewPost : PostDetails -> Html msg
 viewPost post =
     Html.div
         [ Html.Attributes.class "reply" ]
