@@ -1,3 +1,4 @@
 {
-    "cSpell.words": ["screenname", "Subcontinuities"]
+    "cSpell.words": ["screenname", "Subcontinuities"],
+    "elmLS.elmFormatPath": "elm-format-hack"
 }
