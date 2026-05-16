@@ -1,4 +1,4 @@
-module View.Post exposing (viewCharacter, viewCharacterNames, viewContent, viewNames, viewPermalink, viewPicture, viewPost, viewReply)
+module View.Post exposing (viewCharacter, viewCharacterNames, viewContent, viewIcon, viewNames, viewPermalink, viewPost, viewReply)
 
 import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
 import Html exposing (Html)
@@ -66,24 +66,19 @@ viewCharacter :
 viewCharacter reply =
     Html.div
         [ Html.Attributes.class "character" ]
-        [ viewPicture reply
+        [ reply.icon |> Maybe.map viewIcon |> Maybe.withDefault (Html.text "")
         , viewNames reply
         ]
 
 
-viewPicture : { a | icon : Maybe Icon } -> Html msg
-viewPicture { icon } =
-    case icon of
-        Just { id, url } ->
-            Html.a
-                [ Html.Attributes.class "icon"
-                , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
-                ]
-                [ Html.img [ Html.Attributes.src (Url.toString url) ] []
-                ]
-
-        Nothing ->
-            Html.text ""
+viewIcon : Icon -> Html msg
+viewIcon { id, url } =
+    Html.a
+        [ Html.Attributes.class "icon"
+        , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
+        ]
+        [ Html.img [ Html.Attributes.src (Url.toString url) ] []
+        ]
 
 
 viewNames : { r | character : Maybe Character, user : User } -> Html msg

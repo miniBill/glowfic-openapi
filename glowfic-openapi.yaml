@@ -459,13 +459,16 @@ paths:
             responses:
                 "200":
                     description: Successful operation
-                    content: {}
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/CharacterDetails"
                 "403":
                     description: Post is not visible to the user
                     content: {}
                 "404":
                     description: Character not found
-                    content: {}
+                    $ref: "#/components/responses/404"
                 "422":
                     description: Invalid parameters provided
                     content: {}
@@ -1117,6 +1120,50 @@ components:
             required:
                 - id
                 - name
+
+        CharacterDetails:
+            type: object
+            properties:
+                id:
+                    type: integer
+                name:
+                    type: string
+                screenname:
+                    type: string
+                    nullable: true
+                default_icon:
+                    type: object
+                    nullable: true
+                    properties:
+                        id:
+                            type: integer
+                        url:
+                            type: string
+                            format: uri
+                    required:
+                        - id
+                        - url
+                npc:
+                    type: boolean
+                aliases:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            id:
+                                type: integer
+                            name:
+                                type: string
+                        required:
+                            - id
+                            - name
+            required:
+                - id
+                - name
+                - screenname
+                - default_icon
+                - npc
+                - aliases
 
         CharacterExtraFields:
             type: string

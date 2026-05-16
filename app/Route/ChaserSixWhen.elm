@@ -14,9 +14,11 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Parser
 import Html.Parser.Util
+import Id exposing (Id(..))
 import List.Extra
 import Pages.Url
 import RouteBuilder exposing (App, StatelessRoute)
+import SeqDict exposing (SeqDict)
 import Url
 import UrlPath
 import View exposing (View)
@@ -28,7 +30,7 @@ type alias ActionData =
 
 
 type alias Data =
-    Dict Int ( PostDetails, List Reply )
+    SeqDict (Id PostDetails) ( PostDetails, List Reply )
 
 
 type alias Model =
@@ -70,25 +72,25 @@ head _ =
         |> Seo.website
 
 
-rootPost : Int
+rootPost : Id PostDetails
 rootPost =
-    47527
+    Id 47527
 
 
 data : BackendTask FatalError Data
 data =
     Do.do GlowficApi.Extra.login <| \token ->
-    go token [ rootPost ] Dict.empty
+    go token [ rootPost ] SeqDict.empty
 
 
-go : { token : String } -> List Int -> Data -> BackendTask FatalError Data
+go : { token : String } -> List (Id PostDetails) -> Data -> BackendTask FatalError Data
 go token ids acc =
     case ids of
         [] ->
             BackendTask.succeed acc
 
         h :: t ->
-            case Dict.get h acc of
+            case SeqDict.get h acc of
                 Just _ ->
                     go token t acc
 
@@ -101,7 +103,7 @@ go token ids acc =
                                         (post.content :: List.map .content replies)
                                             |> List.filterMap findLink
                                 in
-                                go token (newIds ++ t) (Dict.insert h ( post, replies ) acc)
+                                go token (newIds ++ t) (SeqDict.insert h ( post, replies ) acc)
                             )
 
 
@@ -120,11 +122,11 @@ view app _ =
     }
 
 
-viewThread : Dict Int ( PostDetails, List Reply ) -> Int -> Html msg
+viewThread : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> Id PostDetails -> Html msg
 viewThread posts id =
-    case Dict.get id posts of
+    case SeqDict.get id posts of
         Nothing ->
-            Html.text ("Post #" ++ String.fromInt id ++ " not found")
+            Html.text ("Post #" ++ String.fromInt (Id.toInt id) ++ " not found")
 
         Just ( post, replies ) ->
             Html.div
@@ -149,12 +151,12 @@ viewThread posts id =
                 )
 
 
-threadWidth : Dict Int ( PostDetails, List Reply ) -> List Reply -> Html.Attribute msg
+threadWidth : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> List Reply -> Html.Attribute msg
 threadWidth posts replies =
     let
         l : Int
         l =
-            Dict.size posts
+            SeqDict.size posts
 
         p : Int
         p =
@@ -170,7 +172,7 @@ threadWidth posts replies =
         )
 
 
-parallels : Dict Int ( PostDetails, List Reply ) -> List Reply -> Int
+parallels : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> List Reply -> Int
 parallels posts queue =
     case queue of
         [] ->
@@ -182,7 +184,7 @@ parallels posts queue =
                     parallels posts t
 
                 Just id ->
-                    case Dict.get id posts of
+                    case SeqDict.get id posts of
                         Nothing ->
                             1 + parallels posts t
 
@@ -190,7 +192,7 @@ parallels posts queue =
                             parallels posts replies + parallels posts t
 
 
-viewReplies : Dict Int ( PostDetails, List Reply ) -> List Reply -> List (Html msg)
+viewReplies : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> List Reply -> List (Html msg)
 viewReplies posts replies =
     case replies of
         [] ->
@@ -212,7 +214,7 @@ viewReplies posts replies =
                     View.Post.viewReply h :: viewReplies posts t
 
 
-findLink : String -> Maybe Int
+findLink : String -> Maybe (Id PostDetails)
 findLink content =
     case Html.Parser.run content of
         Ok nodes ->
@@ -222,7 +224,7 @@ findLink content =
             Nothing
 
 
-findPostLink : Html.Parser.Node -> Maybe Int
+findPostLink : Html.Parser.Node -> Maybe (Id PostDetails)
 findPostLink node =
     case node of
         Html.Parser.Element name attrs children ->
@@ -231,7 +233,9 @@ findPostLink node =
                     List.Extra.findMap
                         (\( attrName, attrValue ) ->
                             if attrName == "href" && String.startsWith "https://glowfic.com/posts/" attrValue then
-                                String.toInt (String.dropLeft (String.length "https://glowfic.com/posts/") attrValue)
+                                String.dropLeft (String.length "https://glowfic.com/posts/") attrValue
+                                    |> String.toInt
+                                    |> Maybe.map Id
 
                             else
                                 Nothing

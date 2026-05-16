@@ -1,4 +1,4 @@
-module GlowficApi.Extra exposing (getAllBoardsIdPosts, getPost, login)
+module GlowficApi.Extra exposing (getAllBoardsIdPosts, getCharacterIcon, getPost, login)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
@@ -8,10 +8,13 @@ import BackendTask.Http as Http exposing (Body, Expect)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Json
-import GlowficApi.Types exposing (PostDetails, PostSummary, Reply)
+import GlowficApi.Types exposing (Board, Character, Icon, PostDetails, PostSummary, Reply)
+import Id exposing (Id(..))
 import Json.Decode
+import OpenApi.Common
 import Pages.Script as Script
 import Triple.Extra exposing (from)
+import Url exposing (Url)
 
 
 login : BackendTask FatalError { token : String }
@@ -32,8 +35,31 @@ login =
             )
 
 
-getPost : { token : String } -> Int -> BackendTask FatalError ( PostDetails, List Reply )
-getPost authorization id =
+getCharacterIcon : { token : String } -> Id Character -> BackendTask FatalError (Maybe { id : Id Icon, url : Url })
+getCharacterIcon authorization (Id id) =
+    getCachedWithAuthorization authorization
+        GlowficApi.Api.getCharactersIdRecord
+        { params =
+            { id = id
+            , post_id = Nothing
+            }
+        }
+        |> BackendTask.map
+            (\{ default_icon } ->
+                case default_icon of
+                    OpenApi.Common.Present icon ->
+                        { id = Id icon.id
+                        , url = icon.url
+                        }
+                            |> Just
+
+                    OpenApi.Common.Null ->
+                        Nothing
+            )
+
+
+getPost : { token : String } -> Id PostDetails -> BackendTask FatalError ( PostDetails, List Reply )
+getPost authorization (Id id) =
     getCachedWithAuthorization authorization
         GlowficApi.Api.getPostsIdRecord
         { params = { id = id }
@@ -60,9 +86,9 @@ getPost authorization id =
 
 getAllBoardsIdPosts :
     { token : String }
-    -> Int
+    -> Id Board
     -> BackendTask FatalError (List PostSummary)
-getAllBoardsIdPosts authorization continuityId =
+getAllBoardsIdPosts authorization (Id continuityId) =
     let
         go : Int -> List (List PostSummary) -> BackendTask FatalError (List PostSummary)
         go page acc =

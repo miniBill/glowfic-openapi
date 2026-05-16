@@ -24,6 +24,7 @@
             "elmcraft/core-extra": "2.3.0",
             "hecrj/html-parser": "2.4.0",
             "justinmimbs/time-extra": "1.2.0",
+            "lamdera/containers": "1.0.0",
             "wolfadex/elm-rfc3339": "2.0.0"
         },
         "indirect": {
@@ -46,6 +47,7 @@
             "fredcy/elm-parseint": "2.0.1",
             "jluckyiv/elm-utc-date-strings": "1.0.0",
             "justinmimbs/date": "4.1.0",
+            "lamdera/codecs": "1.0.0",
             "mdgriffith/elm-codegen": "6.0.3",
             "miniBill/elm-codec": "2.3.1",
             "miniBill/elm-unicode": "1.1.2",
