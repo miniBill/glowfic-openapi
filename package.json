@@ -1,10 +1,10 @@
 {
     "license": "BSD-3-Clause",
     "scripts": {
-        "start": "watchexec -c -w glowfic-openapi.yaml --on-busy-update restart 'bun run gen; bun elm-pages dev --debug'",
+        "start": "watchexec -c -w glowfic-openapi.yaml --on-busy-update restart 'bun run gen; bun elm-pages dev --debug --keep-cache'",
         "build": "bun run gen && elm-pages build",
         "download": "bunx elm-pages run ./script/DownloadLinks.elm",
-        "gen": "bunx elm-pages run ~/src/wolfadex/elm-open-api-cli/cli/src/Cli.elm --effect-types dillonkearns/elm-pages ./glowfic-openapi.yaml"
+        "gen": "bunx elm-pages run ~/src/wolfadex/elm-open-api-cli/cli/src/Cli.elm --effect-types dillonkearns/elm-pages.task,dillonkearns/elm-pages.taskrecord ./glowfic-openapi.yaml"
     },
     "devDependencies": {
         "elm": "^0.19.1-6",
