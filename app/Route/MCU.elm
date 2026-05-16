@@ -2,11 +2,12 @@ module Route.MCU exposing (..)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
+import BackendTask.Http as Http
 import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Extra
-import GlowficApi.Types exposing (PostDetails, Reply)
+import GlowficApi.Types exposing (PostDetails, PostSummary, Reply)
 import Head
 import Head.Seo as Seo
 import Html
@@ -64,8 +65,8 @@ head _ =
         |> Seo.website
 
 
-continuity : Int
-continuity =
+continuityId : Int
+continuityId =
     4968
 
 
@@ -73,22 +74,41 @@ data : BackendTask FatalError Data
 data =
     Do.do GlowficApi.Extra.login <| \token ->
     Do.allowFatal
-        (GlowficApi.Api.getBoardsIdPosts
-            { authorization =
-                { authorization = token.token
-                }
-            , params =
-                { id = continuity
-                , page = Nothing
-                }
-            }
-        )
-    <| \{ results } ->
+        (getAllPosts token 1 [])
+    <| \results ->
     Do.each results (\{ id } -> GlowficApi.Extra.getPost token id) <| \posts ->
     posts
         |> List.map (\( p, r ) -> ( p.id, ( p, r ) ))
         |> Dict.fromList
         |> BackendTask.succeed
+
+
+getAllPosts :
+    { token : String }
+    -> Int
+    -> List (List PostSummary)
+    -> BackendTask { fatal : FatalError, recoverable : Http.Error } (List PostSummary)
+getAllPosts token page acc =
+    GlowficApi.Api.getBoardsIdPosts
+        { authorization =
+            { authorization = token.token
+            }
+        , params =
+            { id = continuityId
+            , page = Just page
+            }
+        }
+        |> BackendTask.andThen
+            (\{ results } ->
+                if List.isEmpty results then
+                    acc
+                        |> List.reverse
+                        |> List.concat
+                        |> BackendTask.succeed
+
+                else
+                    getAllPosts token (page + 1) (results :: acc)
+            )
 
 
 view : App Data ActionData {} -> Model -> View (PagesMsg ())
