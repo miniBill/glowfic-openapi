@@ -199,7 +199,7 @@ paths:
                     content: {}
                 404:
                     description: Continuity not found
-                    content: {}
+                    $ref: "#/components/responses/404"
     /boards/{id}/posts:
         get:
             tags:
@@ -221,10 +221,15 @@ paths:
             responses:
                 200:
                     description: Successful operation
-                    content: {}
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/PostSummary"
                 404:
                     description: Continuity not found
-                    content: {}
+                    $ref: "#/components/responses/404"
     /bookmarks:
         post:
             tags:
@@ -1052,6 +1057,26 @@ paths:
                     content: {}
 
 components:
+    responses:
+        "404":
+            description: Not found
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            errors:
+                                type: array
+                                items:
+                                    type: object
+                                    properties:
+                                        message:
+                                            type: string
+                                    required:
+                                        - message
+                        required:
+                            - errors
+
     schemas:
         Active:
             type: string
