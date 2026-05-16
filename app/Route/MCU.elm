@@ -151,9 +151,11 @@ view app model =
             |> List.map
                 (\( _, ( post, replies ) ) ->
                     Html.div
-                        [ Html.Attributes.style "border" "1px solid black"
+                        [ Html.Attributes.style "border" "1px solid white"
                         , Html.Attributes.style "padding" "8px"
+                        , Html.Attributes.style "gap" "8px"
                         , Html.Attributes.style "display" "flex"
+                        , Html.Attributes.style "class" "thread"
                         , Html.Attributes.style "flex-direction" "column"
                         , Html.Attributes.style "max-width" "400px"
                         ]
@@ -164,6 +166,8 @@ view app model =
                 , Html.Attributes.style "flex-wrap" "wrap"
                 , Html.Attributes.style "gap" "8px"
                 , Html.Attributes.style "padding" "8px"
+                , Html.Attributes.style "color" "#f3f3f3"
+                , Html.Attributes.style "background" "#211e2f"
                 ]
             |> List.singleton
     }
@@ -188,14 +192,9 @@ viewPostSummary appData post replies =
                     characterName =
                         characterNames
                             |> SeqSet.toList
+                            |> List.map String.trim
+                            |> List.Extra.removeWhen String.isEmpty
                             |> String.join ", "
-
-                    _ =
-                        if String.contains ", " characterName then
-                            Debug.log "AA?" characterNames
-
-                        else
-                            characterNames
                 in
                 case SeqDict.get characterId appData.charactersIcons of
                     Just { id, url } ->
@@ -217,7 +216,7 @@ viewPostSummary appData post replies =
                             [ Html.Attributes.style "max-width" "90px"
                             , Html.Attributes.style "width" "fit-content"
                             , Html.Attributes.style "height" "60px"
-                            , Html.Attributes.style "border" "1px solid black"
+                            , Html.Attributes.style "border" "1px solid white"
                             , Html.Attributes.style "padding" "4px"
                             ]
                             [ Html.text characterName ]
