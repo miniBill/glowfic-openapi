@@ -93,7 +93,7 @@ go token ids acc =
                     go token t acc
 
                 Nothing ->
-                    getPost token h
+                    GlowficApi.Extra.getPost token h
                         |> BackendTask.andThen
                             (\( post, replies ) ->
                                 let
@@ -103,33 +103,6 @@ go token ids acc =
                                 in
                                 go token (newIds ++ t) (Dict.insert h ( post, replies ) acc)
                             )
-
-
-getPost : { token : String } -> Int -> BackendTask FatalError ( PostDetails, List Reply )
-getPost { token } id =
-    GlowficApi.Api.getPostsId
-        { authorization = { authorization = token }
-        , params = { id = id }
-        }
-        |> BackendTask.andThen
-            (\post ->
-                List.range 0 ((post.num_replies - 1) // 100)
-                    |> List.map
-                        (\page ->
-                            GlowficApi.Api.getPostsIdReplies
-                                { authorization = { authorization = token }
-                                , params =
-                                    { id = id
-                                    , page = Just page
-                                    , per_page = Just 100
-                                    }
-                                }
-                        )
-                    |> BackendTask.combine
-                    |> BackendTask.map List.concat
-                    |> BackendTask.map (\replies -> ( post, replies ))
-            )
-        |> BackendTask.allowFatal
 
 
 view : { app | data : Data } -> Model -> View msg
