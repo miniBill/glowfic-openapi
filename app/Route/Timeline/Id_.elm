@@ -165,16 +165,7 @@ view app model =
             |> SeqDict.toList
             |> List.map
                 (\( _, ( post, replies ) ) ->
-                    Html.div
-                        [ Html.Attributes.style "border" "1px solid white"
-                        , Html.Attributes.style "padding" "8px"
-                        , Html.Attributes.style "gap" "8px"
-                        , Html.Attributes.style "display" "flex"
-                        , Html.Attributes.style "class" "thread"
-                        , Html.Attributes.style "flex-direction" "column"
-                        , Html.Attributes.style "max-width" "400px"
-                        ]
-                        (viewPostSummary app.data post replies)
+                    viewPostSummary app.data post replies
                 )
             |> Html.div
                 [ Html.Attributes.style "display" "flex"
@@ -188,17 +179,18 @@ view app model =
     }
 
 
-viewPostSummary : Data -> PostDetails -> List Reply -> List (Html msg)
+viewPostSummary : Data -> PostDetails -> List Reply -> Html msg
 viewPostSummary appData post replies =
     let
-        name =
-            post.subject
+        charactersIds : SeqDict (Id Character) (SeqSet String)
+        charactersIds =
+            allCharactersIds ( post, replies )
     in
     [ Html.a
         [ Html.Attributes.href ("https://glowfic.com/posts/" ++ String.fromInt post.id)
         ]
-        [ Html.text name ]
-    , allCharactersIds ( post, replies )
+        [ Html.text post.subject ]
+    , charactersIds
         |> SeqDict.toList
         |> List.map
             (\( characterId, characterNames ) ->
@@ -243,3 +235,13 @@ viewPostSummary appData post replies =
             , Html.Attributes.style "gap" "8px"
             ]
     ]
+        |> Html.div
+            [ Html.Attributes.style "border" "1px solid white"
+            , Html.Attributes.style "padding" "8px"
+            , Html.Attributes.style "gap" "8px"
+            , Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "class" "thread"
+            , Html.Attributes.style "flex-direction" "column"
+            , Html.Attributes.style "flex-grow" (String.fromInt (SeqDict.size charactersIds))
+            , Html.Attributes.style "max-width" "600px"
+            ]
