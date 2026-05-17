@@ -1,10 +1,11 @@
-module Route.MCU exposing (..)
+module Route.Timeline.Id_ exposing (..)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
 import BackendTask.Http as Http
 import Dict exposing (Dict)
 import Dict.Extra
+import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Extra
@@ -22,6 +23,7 @@ import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
 import SeqDict.Extra
 import SeqSet exposing (SeqSet)
+import Server.Response as Response exposing (Response)
 import Set
 import Url exposing (Url)
 import UrlPath
@@ -48,14 +50,15 @@ type alias Msg =
 
 
 type alias RouteParams =
-    {}
+    { id : String }
 
 
 route : StatelessRoute RouteParams Data ActionData
 route =
-    RouteBuilder.single
+    RouteBuilder.preRenderWithFallback
         { head = head
         , data = data
+        , pages = BackendTask.succeed [ { id = "4968" }, { id = "4902" } ]
         }
         |> RouteBuilder.buildNoState { view = view }
 
@@ -78,13 +81,19 @@ head _ =
         |> Seo.website
 
 
-continuityId : Id Board
-continuityId =
-    Id 4968
+data : RouteParams -> BackendTask FatalError (Response Data ErrorPage)
+data params =
+    Do.do
+        (case String.toInt params.id of
+            Nothing ->
+                ("Invalid id: " ++ params.id)
+                    |> FatalError.fromString
+                    |> BackendTask.fail
 
-
-data : BackendTask FatalError Data
-data =
+            Just i ->
+                BackendTask.succeed (Id i)
+        )
+    <| \continuityId ->
     Do.do GlowficApi.Extra.login <| \authorization ->
     Do.do (GlowficApi.Extra.getAllBoardsIdPosts authorization continuityId) <| \results ->
     Do.each results (\{ id } -> GlowficApi.Extra.getPost authorization (Id id)) <| \posts ->
@@ -95,6 +104,7 @@ data =
                 |> SeqSet.fromList
                 |> SeqSet.toList
     in
+    Do.log ("Got " ++ String.fromInt (List.length charactersIds) ++ " icons") <| \() ->
     Do.each charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
     { charactersIcons =
         charactersIcons
@@ -113,6 +123,7 @@ data =
                 )
             |> SeqDict.fromList
     }
+        |> Response.render
         |> BackendTask.succeed
 
 
@@ -142,7 +153,7 @@ allCharactersIds ( post, replies ) =
         |> SeqDict.Extra.groupByWith Tuple.first Tuple.second
 
 
-view : App Data ActionData {} -> Model -> View msg
+view : App Data ActionData RouteParams -> Model -> View msg
 view app model =
     { title = "MCU"
     , body =
