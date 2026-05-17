@@ -1,4 +1,4 @@
-module GlowficApi.Extra exposing (getAllBoardsIdPosts, getBoard, getCharacterIcon, getPost, login)
+module GlowficApi.Extra exposing (getAllBoardsIdPosts, getBoard, getCharacter, getPost, login)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
@@ -8,7 +8,7 @@ import BackendTask.Http as Http exposing (Body, Expect)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Json
-import GlowficApi.Types exposing (Board, Character, Icon, PostDetails, PostSummary, Reply)
+import GlowficApi.Types exposing (Board, Character, CharacterDetails, Icon, PostDetails, PostSummary, Reply)
 import Id exposing (Id(..))
 import Json.Decode
 import OpenApi.Common
@@ -35,8 +35,8 @@ login =
             )
 
 
-getCharacterIcon : { token : String } -> Id Character -> BackendTask FatalError (Maybe { id : Id Icon, url : Url })
-getCharacterIcon authorization (Id id) =
+getCharacter : { token : String } -> Id t -> BackendTask FatalError CharacterDetails
+getCharacter authorization (Id id) =
     getCachedWithAuthorization authorization
         GlowficApi.Api.getCharactersIdRecord
         { params =
@@ -44,18 +44,6 @@ getCharacterIcon authorization (Id id) =
             , post_id = Nothing
             }
         }
-        |> BackendTask.map
-            (\{ default_icon } ->
-                case default_icon of
-                    OpenApi.Common.Present icon ->
-                        { id = Id icon.id
-                        , url = icon.url
-                        }
-                            |> Just
-
-                    OpenApi.Common.Null ->
-                        Nothing
-            )
 
 
 getPost : { token : String } -> Id PostDetails -> BackendTask FatalError ( PostDetails, List Reply )

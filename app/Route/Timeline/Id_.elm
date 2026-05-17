@@ -18,6 +18,7 @@ import Html.Attributes
 import Id exposing (Id(..))
 import List.Extra
 import Maybe.Extra
+import OpenApi.Common
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
 import RouteBuilder exposing (App, StatelessRoute)
@@ -39,7 +40,7 @@ type alias ActionData =
 type alias Data =
     { name : String
     , posts : SeqDict (Id PostDetails) ( PostDetails, List Reply )
-    , charactersIcons : SeqDict (Id Character) { id : Id Icon, url : Url }
+    , charactersIcons : SeqDict (Id Character) { icon : Maybe { id : Id Icon, url : Url }, npc : Bool }
     }
 
 
@@ -109,10 +110,7 @@ data params =
     in
     Do.log ("Got " ++ String.fromInt (List.length charactersIds) ++ " icons") <| \() ->
     DoExtra.eachCount charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
-    { charactersIcons =
-        charactersIcons
-            |> List.filterMap (\( f, s ) -> Maybe.map (Tuple.pair f) s)
-            |> SeqDict.fromList
+    { charactersIcons = SeqDict.fromList charactersIcons
     , posts =
         posts
             |> List.map
@@ -131,10 +129,33 @@ data params =
         |> BackendTask.succeed
 
 
-getCharacterIcon : { token : String } -> Id Character -> BackendTask FatalError ( Id Character, Maybe { id : Id Icon, url : Url } )
+getCharacterIcon :
+    { token : String }
+    -> Id Character
+    ->
+        BackendTask
+            FatalError
+            ( Id Character
+            , { icon : Maybe { id : Id Icon, url : Url }
+              , npc : Bool
+              }
+            )
 getCharacterIcon authorization id =
-    GlowficApi.Extra.getCharacterIcon authorization id
-        |> BackendTask.map (\icon -> ( id, icon ))
+    GlowficApi.Extra.getCharacter authorization id
+        |> BackendTask.map
+            (\character ->
+                ( id
+                , { icon =
+                        case character.default_icon of
+                            OpenApi.Common.Null ->
+                                Nothing
+
+                            OpenApi.Common.Present icon ->
+                                Just { id = Id icon.id, url = icon.url }
+                  , npc = character.npc
+                  }
+                )
+            )
 
 
 allCharactersIds : ( PostDetails, List Reply ) -> SeqDict (Id Character) (SeqSet String)
@@ -193,7 +214,7 @@ viewPostSummary appData post replies =
         [ Html.text post.subject ]
     , charactersIds
         |> SeqDict.toList
-        |> List.map
+        |> List.filterMap
             (\( characterId, characterNames ) ->
                 let
                     characterName : String
@@ -205,19 +226,27 @@ viewPostSummary appData post replies =
                             |> String.join ", "
                 in
                 case SeqDict.get characterId appData.charactersIcons of
-                    Just { id, url } ->
-                        Html.a
-                            [ Html.Attributes.class "icon"
-                            , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt (Id.toInt id))
-                            , Html.Attributes.title characterName
-                            ]
-                            [ Html.img
-                                [ Html.Attributes.style "width" "auto"
-                                , Html.Attributes.style "height" "60px"
-                                , Html.Attributes.src (Url.toString url)
-                                ]
-                                []
-                            ]
+                    Just { icon, npc } ->
+                        if npc then
+                            Nothing
+
+                        else
+                            icon
+                                |> Maybe.map
+                                    (\{ id, url } ->
+                                        Html.a
+                                            [ Html.Attributes.class "icon"
+                                            , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt (Id.toInt id))
+                                            , Html.Attributes.title characterName
+                                            ]
+                                            [ Html.img
+                                                [ Html.Attributes.style "width" "auto"
+                                                , Html.Attributes.style "height" "60px"
+                                                , Html.Attributes.src (Url.toString url)
+                                                ]
+                                                []
+                                            ]
+                                    )
 
                     Nothing ->
                         Html.div
@@ -229,6 +258,7 @@ viewPostSummary appData post replies =
                             , Html.Attributes.style "flex" "0 0 0"
                             ]
                             [ Html.text characterName ]
+                            |> Just
             )
         |> Html.div
             [ Html.Attributes.style "display" "flex"
