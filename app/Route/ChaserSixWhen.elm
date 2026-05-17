@@ -16,6 +16,7 @@ import Html.Parser
 import Html.Parser.Util
 import Id exposing (Id(..))
 import List.Extra
+import OpenApi.Common
 import Pages.Url
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
@@ -138,10 +139,10 @@ viewThread posts id =
                         [ Html.Attributes.class "subject" ]
                         [ Html.text post.subject ]
                     , case post.description of
-                        -- Nothing ->
-                        --     Html.text ""
-                        -- Just description ->
-                        description ->
+                        OpenApi.Common.Null ->
+                            Html.text ""
+
+                        OpenApi.Common.Present description ->
                             Html.div
                                 [ Html.Attributes.class "description" ]
                                 [ Html.text description ]

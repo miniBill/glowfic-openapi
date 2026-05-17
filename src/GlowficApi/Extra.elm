@@ -1,4 +1,4 @@
-module GlowficApi.Extra exposing (getAllBoardsIdPosts, getCharacterIcon, getPost, login)
+module GlowficApi.Extra exposing (getAllBoardsIdPosts, getBoard, getCharacterIcon, getPost, login)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
@@ -82,6 +82,22 @@ getPost authorization (Id id) =
                     |> BackendTask.map List.concat
                     |> BackendTask.map (\replies -> ( post, replies ))
             )
+
+
+getBoard :
+    { token : String }
+    -> Id Board
+    ->
+        BackendTask
+            FatalError
+            { id : Int
+            , name : String
+            , board_sections : List { id : Int, name : String, order : Int }
+            }
+getBoard authorization (Id continuityId) =
+    getCachedWithAuthorization authorization
+        GlowficApi.Api.getBoardsIdRecord
+        { params = { id = continuityId } }
 
 
 getAllBoardsIdPosts :

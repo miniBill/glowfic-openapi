@@ -196,7 +196,34 @@ paths:
             responses:
                 200:
                     description: Successful operation
-                    content: {}
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    id:
+                                        type: integer
+                                    name:
+                                        type: string
+                                    board_sections:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                id:
+                                                    type: integer
+                                                name:
+                                                    type: string
+                                                order:
+                                                    type: integer
+                                            required:
+                                                - id
+                                                - name
+                                                - order
+                                required:
+                                    - id
+                                    - name
+                                    - board_sections
                 404:
                     description: Continuity not found
                     $ref: "#/components/responses/404"
@@ -1222,6 +1249,7 @@ components:
                     type: integer
                 description:
                     type: string
+                    nullable: true
                 tagged_at:
                     type: string
                     format: date-time

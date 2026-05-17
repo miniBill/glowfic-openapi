@@ -2,6 +2,7 @@ module Route.Timeline.Id_ exposing (..)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
+import BackendTask.Do.Extra as DoExtra
 import BackendTask.Http as Http
 import Dict exposing (Dict)
 import Dict.Extra
@@ -36,7 +37,8 @@ type alias ActionData =
 
 
 type alias Data =
-    { posts : SeqDict (Id PostDetails) ( PostDetails, List Reply )
+    { name : String
+    , posts : SeqDict (Id PostDetails) ( PostDetails, List Reply )
     , charactersIcons : SeqDict (Id Character) { id : Id Icon, url : Url }
     }
 
@@ -95,8 +97,9 @@ data params =
         )
     <| \continuityId ->
     Do.do GlowficApi.Extra.login <| \authorization ->
+    Do.do (GlowficApi.Extra.getBoard authorization continuityId) <| \board ->
     Do.do (GlowficApi.Extra.getAllBoardsIdPosts authorization continuityId) <| \results ->
-    Do.each results (\{ id } -> GlowficApi.Extra.getPost authorization (Id id)) <| \posts ->
+    DoExtra.eachCount results (\{ id } -> GlowficApi.Extra.getPost authorization (Id id)) <| \posts ->
     let
         charactersIds : List (Id Character)
         charactersIds =
@@ -105,7 +108,7 @@ data params =
                 |> SeqSet.toList
     in
     Do.log ("Got " ++ String.fromInt (List.length charactersIds) ++ " icons") <| \() ->
-    Do.each charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
+    DoExtra.eachCount charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
     { charactersIcons =
         charactersIcons
             |> List.filterMap (\( f, s ) -> Maybe.map (Tuple.pair f) s)
@@ -122,6 +125,7 @@ data params =
                     ( id, ( p, r ) )
                 )
             |> SeqDict.fromList
+    , name = board.name
     }
         |> Response.render
         |> BackendTask.succeed
@@ -155,7 +159,7 @@ allCharactersIds ( post, replies ) =
 
 view : App Data ActionData RouteParams -> Model -> View msg
 view app model =
-    { title = "MCU"
+    { title = app.data.name
     , body =
         app.data.posts
             |> SeqDict.toList
@@ -224,11 +228,12 @@ viewPostSummary appData post replies =
 
                     Nothing ->
                         Html.div
-                            [ Html.Attributes.style "max-width" "90px"
-                            , Html.Attributes.style "width" "fit-content"
-                            , Html.Attributes.style "height" "60px"
+                            [ Html.Attributes.style "height" "60px"
+
+                            -- , Html.Attributes.style "max-width" "120px"
                             , Html.Attributes.style "border" "1px solid white"
                             , Html.Attributes.style "padding" "4px"
+                            , Html.Attributes.style "flex" "0 0 0"
                             ]
                             [ Html.text characterName ]
             )
