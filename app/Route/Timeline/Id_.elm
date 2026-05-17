@@ -170,6 +170,7 @@ view app model =
             |> Html.div
                 [ Html.Attributes.style "display" "flex"
                 , Html.Attributes.style "flex-wrap" "wrap"
+                , Html.Attributes.style "align-items" "start"
                 , Html.Attributes.style "gap" "8px"
                 , Html.Attributes.style "padding" "8px"
                 , Html.Attributes.style "color" "#f3f3f3"
