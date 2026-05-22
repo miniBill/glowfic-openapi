@@ -222,6 +222,25 @@ viewPostSummary appData post replies =
         [ Html.text post.subject ]
     , charactersIds
         |> SeqDict.toList
+        |> List.Extra.stableSortWith
+            (\l r ->
+                case
+                    ( SeqDict.get (Tuple.first l) appData.charactersIcons |> Maybe.andThen .icon
+                    , SeqDict.get (Tuple.first r) appData.charactersIcons |> Maybe.andThen .icon
+                    )
+                of
+                    ( Nothing, Just _ ) ->
+                        GT
+
+                    ( Just _, Nothing ) ->
+                        LT
+
+                    ( Nothing, Nothing ) ->
+                        EQ
+
+                    ( Just _, Just _ ) ->
+                        EQ
+            )
         |> List.filterMap
             (\( characterId, characterNames ) ->
                 let
@@ -236,11 +255,10 @@ viewPostSummary appData post replies =
                     textStyle () =
                         Html.div
                             [ Html.Attributes.style "height" "60px"
-
-                            -- , Html.Attributes.style "max-width" "120px"
+                            , Html.Attributes.style "width" "120px"
                             , Html.Attributes.style "border" "1px solid white"
                             , Html.Attributes.style "padding" "4px"
-                            , Html.Attributes.style "flex" "0 0 0"
+                            , Html.Attributes.style "flex" "0 1 120px"
                             ]
                             [ Html.text characterName ]
                 in
