@@ -81,30 +81,25 @@ retryOn429 budget task =
 
 sleepAndLog : Duration -> BackendTask e ()
 sleepAndLog milliseconds =
-    if milliseconds |> Quantity.lessThanOrEqualTo (Duration.seconds 10) then
+    if milliseconds |> Quantity.lessThanOrEqualTo Duration.second then
         Script.sleep (round (Duration.inMilliseconds milliseconds))
 
     else
         let
-            tenth : Duration
-            tenth =
-                milliseconds |> Quantity.divideBy 10
+            toSleep : Duration
+            toSleep =
+                milliseconds
+                    |> Quantity.divideBy 10
+                    |> Quantity.max Duration.second
+                    |> Quantity.min milliseconds
 
-            step : Float -> (() -> BackendTask e ()) -> BackendTask e ()
-            step i k =
-                Do.do (Script.sleep (round (Duration.inMilliseconds tenth))) <| \() ->
-                Do.log (" - " ++ durationToString (Quantity.multiplyBy i tenth) ++ " left") k
+            left : Quantity.Quantity Float Duration.Seconds
+            left =
+                milliseconds |> Quantity.minus toSleep
         in
-        step 9 <| \() ->
-        step 8 <| \() ->
-        step 7 <| \() ->
-        step 6 <| \() ->
-        step 5 <| \() ->
-        step 4 <| \() ->
-        step 3 <| \() ->
-        step 2 <| \() ->
-        step 1 <| \() ->
-        sleepAndLog tenth
+        Do.log (" - " ++ durationToString milliseconds ++ " left") <| \() ->
+        Do.do (Script.sleep (round (Duration.inMilliseconds toSleep))) <| \() ->
+        sleepAndLog left
 
 
 durationToString : Duration -> String
