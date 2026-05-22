@@ -1,5 +1,6 @@
 module Route.Timeline.Id_ exposing (..)
 
+import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
 import BackendTask.Do.Extra as DoExtra
@@ -108,7 +109,7 @@ data params =
                 |> SeqSet.fromList
                 |> SeqSet.toList
     in
-    Do.log ("Got " ++ String.fromInt (List.length charactersIds) ++ " icons") <| \() ->
+    Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
     DoExtra.eachCount charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
     { charactersIcons = SeqDict.fromList charactersIcons
     , posts =
