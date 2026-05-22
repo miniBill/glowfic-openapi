@@ -114,13 +114,18 @@ data params =
                     |> BackendTask.fail
 
             Just i ->
-                BackendTask.succeed (Id i)
+                let
+                    boardId : Id Board
+                    boardId =
+                        Id.unsafe i
+                in
+                BackendTask.succeed boardId
         )
     <| \continuityId ->
     Do.do GlowficApi.Extra.login <| \authorization ->
     Do.do (GlowficApi.Extra.getBoard authorization continuityId) <| \board ->
     Do.do (GlowficApi.Extra.getAllBoardsIdPosts authorization continuityId) <| \results ->
-    DoExtra.eachCount results (\{ id } -> GlowficApi.Extra.getPost authorization (Id id)) <| \posts ->
+    DoExtra.eachCount results (\post -> GlowficApi.Extra.getPost authorization (Id.unsafe post.id)) <| \posts ->
     let
         charactersIds : List (Id Character)
         charactersIds =
@@ -130,22 +135,22 @@ data params =
     in
     Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
     DoExtra.eachCount charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
-    { charactersIcons = SeqDict.fromList charactersIcons
-    , posts =
-        posts
-            |> List.map
-                (\( p, r ) ->
-                    let
-                        id : Id PostDetails
-                        id =
-                            Id p.id
-                    in
-                    ( id, ( p, r ) )
-                )
-            |> SeqDict.fromList
-    , name = board.name
-    , links = calculatePostsLinks posts
-    }
+    let
+        result : Data
+        result =
+            { charactersIcons = SeqDict.fromList charactersIcons
+            , posts =
+                posts
+                    |> List.map
+                        (\( p, r ) ->
+                            ( Id.for p, ( p, r ) )
+                        )
+                    |> SeqDict.fromList
+            , name = board.name
+            , links = calculatePostsLinks posts
+            }
+    in
+    result
         |> Response.render
         |> BackendTask.succeed
 
@@ -170,13 +175,13 @@ calculatePostLinks ( post, replies ) =
 
 
 calculatePostDetailsLinks : PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope Link)
-calculatePostDetailsLinks { id, content } =
-    calculateContentLinks (MessageIdPost (Id.fromInt id)) content
+calculatePostDetailsLinks ({ id, content } as p) =
+    calculateContentLinks (MessageIdPost (Id.for p)) content
 
 
 calculateReplyLinks : Reply -> Result ( String, List Parser.DeadEnd ) (Rope Link)
-calculateReplyLinks { id, content } =
-    calculateContentLinks (MessageIdReply (Id.fromInt id)) content
+calculateReplyLinks ({ id, content } as r) =
+    calculateContentLinks (MessageIdReply (Id.for r)) content
 
 
 calculateContentLinks : MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope Link)
@@ -245,7 +250,7 @@ nodeToString node =
 targetParser : Parser (Maybe MessageId)
 targetParser =
     Parser.oneOf
-        [ Parser.succeed (\reply -> Just (MessageIdReply (Id.fromInt reply)))
+        [ Parser.succeed (\reply -> Just (MessageIdReply (Id.unsafe reply)))
             |. Parser.oneOf
                 [ Parser.token "/replies/"
                 , Parser.token "https://glowfic.com/replies/"
@@ -253,7 +258,7 @@ targetParser =
             |= Parser.int
             |. Parser.token "#reply-"
             |. Parser.int
-        , Parser.succeed (\reply -> Just (MessageIdPost (Id.fromInt reply)))
+        , Parser.succeed (\reply -> Just (MessageIdPost (Id.unsafe reply)))
             |. Parser.oneOf
                 [ Parser.token "/posts/"
                 , Parser.token "https://glowfic.com/posts/"
@@ -319,7 +324,7 @@ getCharacterIcon authorization id =
                                 Nothing
 
                             OpenApi.Common.Present icon ->
-                                Just { id = Id icon.id, url = icon.url }
+                                Just { id = Id.unsafe icon.id, url = icon.url }
                   , npc = character.npc
                   }
                 )
@@ -328,21 +333,21 @@ getCharacterIcon authorization id =
 
 allCharactersIds : ( PostDetails, List Reply ) -> SeqDict (Id Character) (SeqSet String)
 allCharactersIds ( post, replies ) =
-    (Maybe.map (\{ id, name } -> { id = id, name = name }) post.character
-        :: List.map
-            (\{ character, character_name } ->
-                Maybe.map
-                    (\{ id, name } ->
-                        { id = id
-                        , name = character_name |> Maybe.withDefault name
-                        }
+    let
+        replyToCharacter : Reply -> Maybe ( Id Character, String )
+        replyToCharacter reply =
+            Maybe.map
+                (\character ->
+                    ( Id.for character
+                    , reply.character_name |> Maybe.withDefault character.name
                     )
-                    character
-            )
-            replies
+                )
+                reply.character
+    in
+    (Maybe.map (\character -> ( Id.for character, character.name )) post.character
+        :: List.map replyToCharacter replies
     )
         |> Maybe.Extra.values
-        |> List.map (\{ id, name } -> ( Id id, name ))
         |> SeqDict.Extra.groupByWith Tuple.first Tuple.second
 
 
@@ -396,13 +401,19 @@ viewLinkEndpoint id =
             Html.a
                 [ Html.Attributes.href (GlowficRoute.post pid)
                 ]
-                [ Html.text ("Post: " ++ String.fromInt (Id.toInt pid)) ]
+                [ "Post: {pid}"
+                    |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
+                    |> Html.text
+                ]
 
         MessageIdReply rid ->
             Html.a
                 [ Html.Attributes.href (GlowficRoute.reply rid)
                 ]
-                [ Html.text ("Reply: " ++ String.fromInt (Id.toInt rid)) ]
+                [ "Reply: {rid}"
+                    |> String.replace "{rid}" (String.fromInt (Id.toInt rid))
+                    |> Html.text
+                ]
 
 
 viewPostSummary : Data -> PostDetails -> List Reply -> Html msg
@@ -413,7 +424,7 @@ viewPostSummary appData post replies =
             allCharactersIds ( post, replies )
     in
     [ Html.a
-        [ Html.Attributes.href (GlowficRoute.post (Id post.id))
+        [ Html.Attributes.href (GlowficRoute.post (Id.for post))
         ]
         [ Html.text post.subject ]
     , charactersIds

@@ -5,15 +5,15 @@ import Id exposing (Id(..))
 
 
 reply : Id Reply -> String
-reply (Id rid) =
-    "https://glowfic.com/replies/" ++ String.fromInt rid ++ "#reply-" ++ String.fromInt rid
+reply rid =
+    "https://glowfic.com/replies/" ++ String.fromInt (Id.toInt rid) ++ "#reply-" ++ String.fromInt (Id.toInt rid)
 
 
 post : Id PostDetails -> String
-post (Id pid) =
-    "https://glowfic.com/posts/" ++ String.fromInt pid
+post pid =
+    "https://glowfic.com/posts/" ++ String.fromInt (Id.toInt pid)
 
 
 character : Id Character -> String
-character (Id cid) =
-    "https://glowfic.com/characters/" ++ String.fromInt cid
+character cid =
+    "https://glowfic.com/characters/" ++ String.fromInt (Id.toInt cid)

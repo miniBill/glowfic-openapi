@@ -162,21 +162,21 @@ durationToString duration =
 
 
 getCharacter : { token : String } -> Id t -> BackendTask FatalError CharacterDetails
-getCharacter authorization (Id id) =
+getCharacter authorization id =
     getCachedWithAuthorization authorization
         GlowficApi.Api.getCharactersIdRecord
         { params =
-            { id = id
+            { id = Id.toInt id
             , post_id = Nothing
             }
         }
 
 
 getPost : { token : String } -> Id PostDetails -> BackendTask FatalError ( PostDetails, List Reply )
-getPost authorization (Id id) =
+getPost authorization id =
     getCachedWithAuthorization authorization
         GlowficApi.Api.getPostsIdRecord
-        { params = { id = id }
+        { params = { id = Id.toInt id }
         }
         |> BackendTask.andThen
             (\post ->
@@ -186,7 +186,7 @@ getPost authorization (Id id) =
                             getCachedWithAuthorization authorization
                                 GlowficApi.Api.getPostsIdRepliesRecord
                                 { params =
-                                    { id = id
+                                    { id = Id.toInt id
                                     , page = Just (page + 1)
                                     , per_page = Just 100
                                     }
@@ -208,24 +208,24 @@ getBoard :
             , name : String
             , board_sections : List { id : Int, name : String, order : Int }
             }
-getBoard authorization (Id continuityId) =
+getBoard authorization continuityId =
     getCachedWithAuthorization authorization
         GlowficApi.Api.getBoardsIdRecord
-        { params = { id = continuityId } }
+        { params = { id = Id.toInt continuityId } }
 
 
 getAllBoardsIdPosts :
     { token : String }
     -> Id Board
     -> BackendTask FatalError (List PostSummary)
-getAllBoardsIdPosts authorization (Id continuityId) =
+getAllBoardsIdPosts authorization continuityId =
     let
         go : Int -> List (List PostSummary) -> BackendTask FatalError (List PostSummary)
         go page acc =
             getCachedWithAuthorization authorization
                 GlowficApi.Api.getBoardsIdPostsRecord
                 { params =
-                    { id = continuityId
+                    { id = Id.toInt continuityId
                     , page = Just page
                     }
                 }

@@ -75,7 +75,7 @@ head _ =
 
 rootPost : Id PostDetails
 rootPost =
-    Id 47527
+    Id.unsafe 47527
 
 
 data : BackendTask FatalError Data
@@ -236,7 +236,7 @@ findPostLink node =
                             if attrName == "href" && String.startsWith "https://glowfic.com/posts/" attrValue then
                                 String.dropLeft (String.length "https://glowfic.com/posts/") attrValue
                                     |> String.toInt
-                                    |> Maybe.map Id
+                                    |> Maybe.map Id.unsafe
 
                             else
                                 Nothing

@@ -27,7 +27,7 @@ viewPost post =
             }
         , Html.div
             [ Html.Attributes.class "content" ]
-            (viewPermalink (GlowficRoute.post (Id post.id))
+            (viewPermalink (GlowficRoute.post (Id.for post))
                 :: viewContent post
             )
         ]
@@ -40,7 +40,7 @@ viewReply reply =
         [ viewCharacter reply
         , Html.div
             [ Html.Attributes.class "content" ]
-            (viewPermalink (GlowficRoute.reply (Id reply.id))
+            (viewPermalink (GlowficRoute.reply (Id.for reply))
                 :: viewContent reply
             )
         ]
