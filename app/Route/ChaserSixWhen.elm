@@ -75,12 +75,12 @@ rootPost =
 
 data : BackendTask FatalError Data
 data =
-    Do.do GlowficApi.Extra.login <| \token ->
-    go token [ rootPost ] SeqDict.empty
+    Do.do GlowficApi.Extra.login <| \( token, got429 ) ->
+    go got429 token [ rootPost ] SeqDict.empty
 
 
-go : { token : String } -> List (Id PostDetails) -> Data -> BackendTask FatalError Data
-go token ids acc =
+go : { got429 : Bool } -> { token : String } -> List (Id PostDetails) -> Data -> BackendTask FatalError Data
+go got429 token ids acc =
     case ids of
         [] ->
             BackendTask.succeed acc
@@ -88,18 +88,18 @@ go token ids acc =
         h :: t ->
             case SeqDict.get h acc of
                 Just _ ->
-                    go token t acc
+                    go got429 token t acc
 
                 Nothing ->
-                    GlowficApi.Extra.getPost token h
+                    GlowficApi.Extra.getPost got429 token h
                         |> BackendTask.andThen
-                            (\( post, replies ) ->
+                            (\( ( post, replies ), newGot429 ) ->
                                 let
                                     newIds =
                                         (post.content :: List.map .content replies)
                                             |> List.filterMap findLink
                                 in
-                                go token (newIds ++ t) (SeqDict.insert h ( post, replies ) acc)
+                                go newGot429 token (newIds ++ t) (SeqDict.insert h ( post, replies ) acc)
                             )
 
 

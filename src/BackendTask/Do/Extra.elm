@@ -1,4 +1,4 @@
-module BackendTask.Do.Extra exposing (eachCount)
+module BackendTask.Do.Extra exposing (eachCountWithCircuitBreaker)
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
@@ -9,12 +9,13 @@ import Json.Decode
 import Json.Encode
 
 
-eachCount :
-    List a
-    -> (a -> BackendTask FatalError b)
-    -> (List b -> BackendTask FatalError c)
+eachCountWithCircuitBreaker :
+    { got429 : Bool }
+    -> List a
+    -> ({ got429 : Bool } -> a -> BackendTask FatalError ( b, { got429 : Bool } ))
+    -> (( List b, { got429 : Bool } ) -> BackendTask FatalError c)
     -> BackendTask FatalError c
-eachCount list fn then_ =
+eachCountWithCircuitBreaker outer429 list fn then_ =
     let
         count : Int
         count =
@@ -30,7 +31,7 @@ eachCount list fn then_ =
     in
     list
         |> List.indexedMap
-            (\i v ->
+            (\i v r ->
                 let
                     msg : String
                     msg =
@@ -38,7 +39,16 @@ eachCount list fn then_ =
                             |> Ansi.Color.fontColor (Ansi.Color.rgb { red = 0x90, green = 0x90, blue = 0x90 })
                 in
                 Do.allowFatal (BackendTask.Custom.run "write" (Json.Encode.string msg) (Json.Decode.succeed ()) |> BackendTask.quiet) <| \() ->
-                fn v
+                fn r v
             )
-        |> BackendTask.sequence
+        |> List.foldl
+            (\e ->
+                BackendTask.andThen
+                    (\( a, inner429 ) ->
+                        e inner429
+                            |> BackendTask.map (\( er, new429 ) -> ( er :: a, new429 ))
+                    )
+            )
+            (BackendTask.succeed ( [], outer429 ))
+        |> BackendTask.map (Tuple.mapFirst List.reverse)
         |> BackendTask.andThen then_

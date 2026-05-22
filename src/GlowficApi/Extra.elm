@@ -13,12 +13,13 @@ import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Types exposing (Board, CharacterDetails, PostDetails, PostSummary, Reply)
 import Id exposing (Id)
+import List.Extra
 import Pages.Script as Script
 import Quantity
 import Time as CoreTime
 
 
-login : BackendTask FatalError { token : String }
+login : BackendTask FatalError ( { token : String }, { got429 : Bool } )
 login =
     let
         tokenPath : String
@@ -26,7 +27,6 @@ login =
             ".elm-pages/http-response-cache/token"
     in
     File.rawFile tokenPath
-        |> BackendTask.map (\token -> { token = token })
         |> BackendTask.allowFatal
         |> BackendTask.onError
             (\_ ->
@@ -47,8 +47,9 @@ login =
                     )
                 <| \auth ->
                 Do.allowFatal (Script.writeFile { path = tokenPath, body = auth.token }) <| \_ ->
-                BackendTask.succeed auth
+                BackendTask.succeed auth.token
             )
+        |> BackendTask.map (\token -> ( { token = token }, { got429 = False } ))
 
 
 retryOn429 :
@@ -166,9 +167,10 @@ durationToString duration =
         String.fromInt milliseconds ++ "ms"
 
 
-getCharacter : { token : String } -> Id t -> BackendTask FatalError CharacterDetails
-getCharacter authorization id =
-    getRefreshingIf (\_ -> False)
+getCharacter : { got429 : Bool } -> { token : String } -> Id t -> BackendTask FatalError ( CharacterDetails, { got429 : Bool } )
+getCharacter got429 authorization id =
+    getRefreshingIf got429
+        (\_ -> False)
         ("getCharacter " ++ Id.toString id)
         GlowficApi.Api.getCharactersIdRecord
         authorization
@@ -179,16 +181,17 @@ getCharacter authorization id =
         }
 
 
-getPost : { token : String } -> Id PostDetails -> BackendTask FatalError ( PostDetails, List Reply )
-getPost authorization id =
-    getRefreshingIf (\post -> post.status /= GlowficApi.Types.Status__Complete)
+getPost : { got429 : Bool } -> { token : String } -> Id PostDetails -> BackendTask FatalError ( ( PostDetails, List Reply ), { got429 : Bool } )
+getPost got429 authorization id =
+    getRefreshingIf got429
+        (\post -> post.status /= GlowficApi.Types.Status__Complete)
         ("getPost " ++ Id.toString id)
         GlowficApi.Api.getPostsIdRecord
         authorization
         { params = { id = Id.toInt id }
         }
         |> BackendTask.andThen
-            (\post ->
+            (\( post, newTryRefresh ) ->
                 let
                     maxPage : Int
                     maxPage =
@@ -196,8 +199,9 @@ getPost authorization id =
                 in
                 List.range 1 maxPage
                     |> List.map
-                        (\page ->
-                            getRefreshingIf (\_ -> page == maxPage && post.status /= GlowficApi.Types.Status__Complete)
+                        (\page innerGot429 ->
+                            getRefreshingIf innerGot429
+                                (\_ -> page == maxPage && post.status /= GlowficApi.Types.Status__Complete)
                                 ("getPost " ++ Id.toString id ++ " page " ++ String.fromInt page)
                                 GlowficApi.Api.getPostsIdRepliesRecord
                                 authorization
@@ -208,24 +212,69 @@ getPost authorization id =
                                     }
                                 }
                         )
-                    |> BackendTask.combine
-                    |> BackendTask.map List.concat
-                    |> BackendTask.map (\replies -> ( post, replies ))
+                    |> combineWithCircuitBreaker newTryRefresh
+                    |> BackendTask.map
+                        (\( replies, nextTryRefresh ) ->
+                            ( ( post, List.concat replies ), nextTryRefresh )
+                        )
+            )
+
+
+combineWithCircuitBreaker :
+    { got429 : Bool }
+    ->
+        List
+            ({ got429 : Bool }
+             -> BackendTask FatalError ( List Reply, { got429 : Bool } )
+            )
+    -> BackendTask FatalError ( List (List Reply), { got429 : Bool } )
+combineWithCircuitBreaker got429 list =
+    list
+        |> List.Extra.greedyGroupsOf 10
+        |> List.foldl
+            (\group prev ->
+                prev
+                    |> BackendTask.andThen
+                        (\( acc, ref ) ->
+                            List.map (\f -> f ref) group
+                                |> BackendTask.combine
+                                |> BackendTask.map
+                                    (\groupResult ->
+                                        let
+                                            ( f, s ) =
+                                                List.unzip groupResult
+                                        in
+                                        ( f :: acc, { got429 = List.any .got429 s } )
+                                    )
+                        )
+            )
+            (BackendTask.succeed ( [], got429 ))
+        |> BackendTask.map
+            (\( l, got ) ->
+                ( l
+                    |> List.reverse
+                    |> List.concat
+                , got
+                )
             )
 
 
 getBoard :
-    { token : String }
+    { got429 : Bool }
+    -> { token : String }
     -> Id Board
     ->
         BackendTask
             FatalError
-            { id : Int
-            , name : String
-            , board_sections : List { id : Int, name : String, order : Int }
-            }
-getBoard authorization id =
-    getRefreshingIf (\_ -> True)
+            ( { id : Int
+              , name : String
+              , board_sections : List { id : Int, name : String, order : Int }
+              }
+            , { got429 : Bool }
+            )
+getBoard got429 authorization id =
+    getRefreshingIf got429
+        (\_ -> True)
         ("getBoard " ++ Id.toString id)
         GlowficApi.Api.getBoardsIdRecord
         authorization
@@ -233,14 +282,20 @@ getBoard authorization id =
 
 
 getAllBoardsIdPosts :
-    { token : String }
+    { got429 : Bool }
+    -> { token : String }
     -> Id Board
-    -> BackendTask FatalError (List PostSummary)
-getAllBoardsIdPosts authorization continuityId =
+    -> BackendTask FatalError ( List PostSummary, { got429 : Bool } )
+getAllBoardsIdPosts got429 authorization continuityId =
     let
-        go : Int -> List (List PostSummary) -> BackendTask FatalError (List PostSummary)
-        go page acc =
-            getRefreshingIf (\_ -> True)
+        go :
+            { got429 : Bool }
+            -> Int
+            -> List (List PostSummary)
+            -> BackendTask FatalError ( List PostSummary, { got429 : Bool } )
+        go innerRefresh page acc =
+            getRefreshingIf innerRefresh
+                (\_ -> True)
                 ("getAllBoardsIdPosts " ++ Id.toString continuityId)
                 GlowficApi.Api.getBoardsIdPostsRecord
                 authorization
@@ -250,22 +305,25 @@ getAllBoardsIdPosts authorization continuityId =
                     }
                 }
                 |> BackendTask.andThen
-                    (\{ results } ->
+                    (\( { results }, newInnerRefresh ) ->
                         if List.isEmpty results then
-                            acc
+                            ( acc
                                 |> List.reverse
                                 |> List.concat
+                            , newInnerRefresh
+                            )
                                 |> BackendTask.succeed
 
                         else
-                            go (page + 1) (results :: acc)
+                            go newInnerRefresh (page + 1) (results :: acc)
                     )
     in
-    go 1 []
+    go got429 1 []
 
 
 getRefreshingIf :
-    (result -> Bool)
+    { got429 : Bool }
+    -> (result -> Bool)
     -> String
     ->
         ({ authorization : { authorization : String }, params : params }
@@ -282,8 +340,8 @@ getRefreshingIf :
         )
     -> { token : String }
     -> { params : params }
-    -> BackendTask FatalError result
-getRefreshingIf refreshCondition label toTuple { token } { params } =
+    -> BackendTask FatalError ( result, { got429 : Bool } )
+getRefreshingIf { got429 } refreshCondition label toTuple { token } { params } =
     let
         ( record, expect ) =
             toTuple
@@ -308,25 +366,26 @@ getRefreshingIf refreshCondition label toTuple { token } { params } =
     case fromCache of
         Err _ ->
             -- Not in cache, refresh
-            getWith Http.ForceRevalidate
-                |> retryOn429 10
-                |> BackendTask.allowFatal
+            Do.allowFatal (retryOn429 10 (getWith Http.ForceRevalidate)) <| \res ->
+            -- Counterintuitively, if we got a 429 we set this to False anyway
+            -- because by the time retryOn429 finishes we're out of the retry loop
+            BackendTask.succeed ( res, { got429 = False } )
 
         Ok cached ->
-            if refreshCondition cached then
+            if not got429 && refreshCondition cached then
                 Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("♻️ Hit refresh condition for " ++ label ++ ", refreshing")) <| \() ->
                 getWith Http.ForceRevalidate
                     |> useCachedOn429 cached
                     |> BackendTask.allowFatal
 
             else
-                BackendTask.succeed cached
+                BackendTask.succeed ( cached, { got429 = got429 } )
 
 
 useCachedOn429 :
     a
     -> BackendTask { fatal : FatalError, recoverable : Http.Error } a
-    -> BackendTask { fatal : FatalError, recoverable : Http.Error } a
+    -> BackendTask { fatal : FatalError, recoverable : Http.Error } ( a, { got429 : Bool } )
 useCachedOn429 cached task =
     BackendTask.onError
         (\({ recoverable } as err) ->
@@ -334,7 +393,7 @@ useCachedOn429 cached task =
                 Http.BadStatus metadata _ ->
                     if metadata.statusCode == 429 then
                         Do.log (Ansi.Color.fontColor Ansi.Color.cyan "⚠️ Refreshing failed with a 429, using cached") <| \() ->
-                        BackendTask.succeed cached
+                        BackendTask.succeed ( cached, { got429 = True } )
 
                     else
                         BackendTask.fail err
@@ -351,7 +410,7 @@ useCachedOn429 cached task =
                 Http.BadBody _ _ ->
                     BackendTask.fail err
         )
-        task
+        (task |> BackendTask.map (\r -> ( r, { got429 = False } )))
 
 
 ensureCacheFolderExists : BackendTask { fatal : FatalError, recoverable : Script.Error } ()

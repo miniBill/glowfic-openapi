@@ -114,10 +114,10 @@ data params =
                 BackendTask.succeed boardId
         )
     <| \continuityId ->
-    Do.do GlowficApi.Extra.login <| \authorization ->
-    Do.do (GlowficApi.Extra.getBoard authorization continuityId) <| \board ->
-    Do.do (GlowficApi.Extra.getAllBoardsIdPosts authorization continuityId) <| \results ->
-    DoExtra.eachCount results (\post -> GlowficApi.Extra.getPost authorization (Id.unsafe post.id)) <| \posts ->
+    Do.do GlowficApi.Extra.login <| \( authorization, break1 ) ->
+    Do.do (GlowficApi.Extra.getBoard break1 authorization continuityId) <| \( board, break2 ) ->
+    Do.do (GlowficApi.Extra.getAllBoardsIdPosts break2 authorization continuityId) <| \( results, break3 ) ->
+    DoExtra.eachCountWithCircuitBreaker break3 results (\brk post -> GlowficApi.Extra.getPost brk authorization (Id.unsafe post.id)) <| \( posts, break4 ) ->
     let
         charactersIds : List (Id Character)
         charactersIds =
@@ -126,7 +126,7 @@ data params =
                 |> SeqSet.toList
     in
     Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("🧑 Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
-    DoExtra.eachCount charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
+    DoExtra.eachCountWithCircuitBreaker break4 charactersIds (\brk id -> getCharacterIcon brk authorization id) <| \( charactersIcons, _ ) ->
     let
         replyToPost : SeqDict (Id Reply) (Id PostDetails)
         replyToPost =
@@ -296,30 +296,35 @@ targetParser replyToPost from =
 
 
 getCharacterIcon :
-    { token : String }
+    { got429 : Bool }
+    -> { token : String }
     -> Id Character
     ->
         BackendTask
             FatalError
-            ( Id Character
-            , { icon : Maybe { id : Id Icon, url : Url }
-              , npc : Bool
-              }
+            ( ( Id Character
+              , { icon : Maybe { id : Id Icon, url : Url }
+                , npc : Bool
+                }
+              )
+            , { got429 : Bool }
             )
-getCharacterIcon authorization id =
-    GlowficApi.Extra.getCharacter authorization id
+getCharacterIcon got429 authorization id =
+    GlowficApi.Extra.getCharacter got429 authorization id
         |> BackendTask.map
-            (\character ->
-                ( id
-                , { icon =
+            (\( character, newGot429 ) ->
+                ( ( id
+                  , { icon =
                         case character.default_icon of
                             OpenApi.Common.Null ->
                                 Nothing
 
                             OpenApi.Common.Present icon ->
                                 Just { id = Id.unsafe icon.id, url = icon.url }
-                  , npc = character.npc
-                  }
+                    , npc = character.npc
+                    }
+                  )
+                , newGot429
                 )
             )
 
@@ -355,9 +360,7 @@ view app _ =
                     viewPostSummary app.data post replies
                 )
             |> Html.div
-                [ Html.Attributes.style "display" "flex"
-                , Html.Attributes.style "flex-wrap" "wrap"
-                , Html.Attributes.style "align-items" "start"
+                [ Html.Attributes.style "display" "grid"
                 , Html.Attributes.style "gap" "8px"
                 , Html.Attributes.style "padding" "8px"
                 , Html.Attributes.style "color" "#f3f3f3"
