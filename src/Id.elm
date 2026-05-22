@@ -1,4 +1,4 @@
-module Id exposing (Id, for, toInt, unsafe)
+module Id exposing (Id, for, toInt, toString, unsafe)
 
 
 type Id t
@@ -18,3 +18,8 @@ toInt (Id i) =
 for : { a | id : Int } -> Id { a | id : Int }
 for t =
     Id t.id
+
+
+toString : Id t -> String
+toString (Id i) =
+    String.fromInt i

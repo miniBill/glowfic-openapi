@@ -1120,11 +1120,6 @@ components:
                             - errors
 
     schemas:
-        Active:
-            type: string
-            enum:
-                - "active"
-
         Board:
             type: object
             properties:
@@ -1243,8 +1238,8 @@ components:
                 status:
                     type: string
                     enum:
-                        - complete
                         - active
+                        - complete
                 section_order:
                     type: integer
                 description:
@@ -1302,6 +1297,12 @@ components:
                 - id
                 - content
                 - user
+
+        Status:
+            type: string
+            enum:
+                - "active"
+                - "complete"
 
         User:
             type: object

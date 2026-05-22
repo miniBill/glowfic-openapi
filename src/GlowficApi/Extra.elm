@@ -158,8 +158,10 @@ durationToString duration =
 
 getCharacter : { token : String } -> Id t -> BackendTask FatalError CharacterDetails
 getCharacter authorization id =
-    getCachedWithAuthorization authorization
+    getRefreshingIf (\_ -> False)
+        ("getCharacter " ++ Id.toString id)
         GlowficApi.Api.getCharactersIdRecord
+        authorization
         { params =
             { id = Id.toInt id
             , post_id = Nothing
@@ -169,20 +171,29 @@ getCharacter authorization id =
 
 getPost : { token : String } -> Id PostDetails -> BackendTask FatalError ( PostDetails, List Reply )
 getPost authorization id =
-    getCachedWithAuthorization authorization
+    getRefreshingIf (\post -> post.status /= GlowficApi.Types.Status__Complete)
+        ("getPost " ++ Id.toString id)
         GlowficApi.Api.getPostsIdRecord
+        authorization
         { params = { id = Id.toInt id }
         }
         |> BackendTask.andThen
             (\post ->
-                List.range 0 ((post.num_replies - 1) // 100)
+                let
+                    maxPage : Int
+                    maxPage =
+                        ((post.num_replies - 1) // 100) + 1
+                in
+                List.range 1 maxPage
                     |> List.map
                         (\page ->
-                            getCachedWithAuthorization authorization
+                            getRefreshingIf (\_ -> page == maxPage && post.status /= GlowficApi.Types.Status__Complete)
+                                ("getPost " ++ Id.toString id ++ " page " ++ String.fromInt page)
                                 GlowficApi.Api.getPostsIdRepliesRecord
+                                authorization
                                 { params =
                                     { id = Id.toInt id
-                                    , page = Just (page + 1)
+                                    , page = Just page
                                     , per_page = Just 100
                                     }
                                 }
@@ -203,10 +214,12 @@ getBoard :
             , name : String
             , board_sections : List { id : Int, name : String, order : Int }
             }
-getBoard authorization continuityId =
-    getCachedWithAuthorization authorization
+getBoard authorization id =
+    getRefreshingIf (\_ -> True)
+        ("getBoard " ++ Id.toString id)
         GlowficApi.Api.getBoardsIdRecord
-        { params = { id = Id.toInt continuityId } }
+        authorization
+        { params = { id = Id.toInt id } }
 
 
 getAllBoardsIdPosts :
@@ -217,8 +230,10 @@ getAllBoardsIdPosts authorization continuityId =
     let
         go : Int -> List (List PostSummary) -> BackendTask FatalError (List PostSummary)
         go page acc =
-            getCachedWithAuthorization authorization
+            getRefreshingIf (\_ -> True)
+                ("getAllBoardsIdPosts " ++ Id.toString continuityId)
                 GlowficApi.Api.getBoardsIdPostsRecord
+                authorization
                 { params =
                     { id = Id.toInt continuityId
                     , page = Just page
@@ -239,8 +254,9 @@ getAllBoardsIdPosts authorization continuityId =
     go 1 []
 
 
-getCachedWithAuthorization :
-    { token : String }
+getRefreshingIf :
+    (result -> Bool)
+    -> String
     ->
         ({ authorization : { authorization : String }, params : params }
          ->
@@ -254,36 +270,78 @@ getCachedWithAuthorization :
             , Expect result
             )
         )
+    -> { token : String }
     -> { params : params }
     -> BackendTask FatalError result
-getCachedWithAuthorization { token } toTuple { params } =
+getRefreshingIf refreshCondition label toTuple { token } { params } =
     let
         ( record, expect ) =
             toTuple
                 { authorization = { authorization = token }
                 , params = params
                 }
-    in
-    Do.do (File.exists ".elm-pages/http-response-cache/keep") <| \exists ->
-    Do.allowFatal
-        (if not exists then
-            Script.writeFile
-                { path = ".elm-pages/http-response-cache/keep"
-                , body = ""
-                }
 
-         else
-            BackendTask.succeed ()
+        getWith : Http.CacheStrategy -> BackendTask { fatal : FatalError, recoverable : Http.Error } result
+        getWith cachePolicy =
+            Http.getWithOptions
+                { url = record.url
+                , expect = expect
+                , retries = record.retries
+                , timeoutInMs = record.timeoutInMs
+                , headers = record.headers
+                , cachePath = Just ".elm-pages/http-response-cache"
+                , cacheStrategy = Just cachePolicy
+                }
+    in
+    Do.allowFatal ensureCacheFolderExists <| \_ ->
+    Do.do (getWith Http.ForceCache |> BackendTask.toResult) <| \fromCache ->
+    case fromCache of
+        Err _ ->
+            -- Not in cache, refresh
+            getWith Http.ForceRevalidate
+                |> retryOn429 10
+                |> BackendTask.allowFatal
+
+        Ok cached ->
+            if refreshCondition cached then
+                Do.log ("Hit refresh condition for " ++ label ++ ", refreshing") <| \() ->
+                getWith Http.ForceRevalidate
+                    |> useCachedOn429 cached
+                    |> BackendTask.allowFatal
+
+            else
+                BackendTask.succeed cached
+
+
+useCachedOn429 :
+    a
+    -> BackendTask { fatal : FatalError, recoverable : Http.Error } a
+    -> BackendTask { fatal : FatalError, recoverable : Http.Error } a
+useCachedOn429 cached task =
+    BackendTask.onError
+        (\({ recoverable } as err) ->
+            case recoverable of
+                Http.BadStatus metadata _ ->
+                    if metadata.statusCode == 429 then
+                        BackendTask.succeed cached
+
+                    else
+                        BackendTask.fail err
+
+                _ ->
+                    BackendTask.fail err
         )
-    <| \_ ->
-    Http.getWithOptions
-        { url = record.url
-        , expect = expect
-        , retries = record.retries
-        , timeoutInMs = record.timeoutInMs
-        , headers = record.headers
-        , cachePath = Just ".elm-pages/http-response-cache"
-        , cacheStrategy = Just Http.ForceCache
-        }
-        |> retryOn429 10
-        |> BackendTask.allowFatal
+        task
+
+
+ensureCacheFolderExists : BackendTask { fatal : FatalError, recoverable : Script.Error } ()
+ensureCacheFolderExists =
+    Do.do (File.exists ".elm-pages/http-response-cache/keep") <| \exists ->
+    if not exists then
+        Script.writeFile
+            { path = ".elm-pages/http-response-cache/keep"
+            , body = ""
+            }
+
+    else
+        BackendTask.succeed ()

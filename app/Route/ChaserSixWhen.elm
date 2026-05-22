@@ -75,9 +75,8 @@ rootPost =
 
 data : BackendTask FatalError Data
 data =
-    Do.do GlowficApi.Extra.login <|
-        \token ->
-            go token [ rootPost ] SeqDict.empty
+    Do.do GlowficApi.Extra.login <| \token ->
+    go token [ rootPost ] SeqDict.empty
 
 
 go : { token : String } -> List (Id PostDetails) -> Data -> BackendTask FatalError Data
@@ -123,7 +122,7 @@ viewThread : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> Id PostDeta
 viewThread posts id =
     case SeqDict.get id posts of
         Nothing ->
-            Html.text ("Post #" ++ String.fromInt (Id.toInt id) ++ " not found")
+            Html.text ("Post #" ++ Id.toString id ++ " not found")
 
         Just ( post, replies ) ->
             Html.div

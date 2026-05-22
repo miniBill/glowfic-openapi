@@ -275,7 +275,7 @@ targetParser replyToPost from =
                                 Parser.succeed Nothing
 
                             else
-                                ("While parsing " ++ messageIdToString from ++ ", could not find post for reply id " ++ String.fromInt (Id.toInt id))
+                                ("While parsing " ++ messageIdToString from ++ ", could not find post for reply id " ++ Id.toString id)
                                     |> Parser.problem
                 )
         , Parser.succeed (\reply -> Just (MessageIdPost (Id.unsafe reply)))
@@ -430,7 +430,7 @@ viewLinks appData =
                             (\pid ->
                                 let
                                     pidString =
-                                        String.fromInt (Id.toInt pid)
+                                        Id.toString pid
                                 in
                                 case SeqDict.get pid appData.posts of
                                     Nothing ->
@@ -455,8 +455,8 @@ viewLinks appData =
                             ls
                                 |> List.map
                                     (\{ from, to, label } ->
-                                        [ String.fromInt (Id.toInt (toPostId from))
-                                        , String.fromInt (Id.toInt (toPostId to))
+                                        [ Id.toString (toPostId from)
+                                        , Id.toString (toPostId to)
                                         , label
                                         ]
                                             |> String.join " "
@@ -482,7 +482,7 @@ viewLinkEndpoint id =
                 [ Html.Attributes.href (GlowficRoute.post pid)
                 ]
                 [ "Post {pid}"
-                    |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
+                    |> String.replace "{pid}" (Id.toString pid)
                     |> Html.text
                 ]
 
@@ -491,8 +491,8 @@ viewLinkEndpoint id =
                 [ Html.Attributes.href (GlowficRoute.reply rid)
                 ]
                 [ "Reply {rid} from post {pid}"
-                    |> String.replace "{rid}" (String.fromInt (Id.toInt rid))
-                    |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
+                    |> String.replace "{rid}" (Id.toString rid)
+                    |> String.replace "{pid}" (Id.toString pid)
                     |> Html.text
                 ]
 
@@ -502,12 +502,12 @@ messageIdToString id =
     case id of
         MessageIdPost pid ->
             "Post {pid}"
-                |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
+                |> String.replace "{pid}" (Id.toString pid)
 
         MessageIdReply pid rid ->
             "Reply {rid} from post {pid}"
-                |> String.replace "{rid}" (String.fromInt (Id.toInt rid))
-                |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
+                |> String.replace "{rid}" (Id.toString rid)
+                |> String.replace "{pid}" (Id.toString pid)
 
 
 viewPostSummary : Data -> PostDetails -> List Reply -> Html msg
