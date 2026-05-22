@@ -34,38 +34,43 @@ login =
                         , password = password
                         }
                     }
-                    |> retryOn429
+                    |> retryOn429 10
                     |> BackendTask.allowFatal
             )
 
 
 retryOn429 :
-    BackendTask { a | recoverable : Http.Error } b
+    Int
     -> BackendTask { a | recoverable : Http.Error } b
-retryOn429 task =
-    BackendTask.onError
-        (\({ recoverable } as err) ->
-            case recoverable of
-                Http.BadStatus metadata body ->
-                    case Dict.get "ratelimit-reset" metadata.headers |> Maybe.andThen String.toInt of
-                        Just resetAt ->
-                            Do.do Time.now <| \now ->
-                            let
-                                delta : Int
-                                delta =
-                                    resetAt * 1000 - CoreTime.posixToMillis now
-                            in
-                            Do.log ("Hit a 429, sleeping for " ++ String.fromInt (delta // 1000) ++ "s") <| \() ->
-                            Do.do (Script.sleep delta) <| \() ->
-                            task
-
-                        Nothing ->
-                            BackendTask.fail err
-
-                _ ->
-                    BackendTask.fail err
-        )
+    -> BackendTask { a | recoverable : Http.Error } b
+retryOn429 budget task =
+    if budget <= 1 then
         task
+
+    else
+        BackendTask.onError
+            (\({ recoverable } as err) ->
+                case recoverable of
+                    Http.BadStatus metadata body ->
+                        case Dict.get "ratelimit-reset" metadata.headers |> Maybe.andThen String.toInt of
+                            Just resetAt ->
+                                Do.do Time.now <| \now ->
+                                let
+                                    delta : Int
+                                    delta =
+                                        resetAt * 1000 - CoreTime.posixToMillis now
+                                in
+                                Do.log ("Hit a 429, sleeping for " ++ String.fromInt (delta // 1000) ++ "s") <| \() ->
+                                Do.do (Script.sleep delta) <| \() ->
+                                retryOn429 (budget - 1) task
+
+                            Nothing ->
+                                BackendTask.fail err
+
+                    _ ->
+                        BackendTask.fail err
+            )
+            task
 
 
 getCharacter : { token : String } -> Id t -> BackendTask FatalError CharacterDetails
@@ -197,5 +202,5 @@ getCachedWithAuthorization { token } toTuple { params } =
         , cachePath = Just ".elm-pages/http-response-cache"
         , cacheStrategy = Just Http.ForceCache
         }
-        |> retryOn429
+        |> retryOn429 10
         |> BackendTask.allowFatal
