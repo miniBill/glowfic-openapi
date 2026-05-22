@@ -142,6 +142,9 @@ durationToString duration =
     else if milliseconds >= minute then
         String.fromInt (milliseconds // minute) ++ "m " ++ String.fromInt (milliseconds // second |> modBy 60) ++ "s"
 
+    else if milliseconds >= 10 * second then
+        String.fromInt (milliseconds // second) ++ "." ++ String.padLeft 1 '0' (String.fromInt ((milliseconds |> modBy 1000) // 100)) ++ "s"
+
     else if milliseconds >= second then
         String.fromInt (milliseconds // second) ++ "." ++ String.padLeft 3 '0' (String.fromInt (milliseconds |> modBy 1000)) ++ "s"
 
