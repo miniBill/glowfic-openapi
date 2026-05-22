@@ -126,7 +126,7 @@ data params =
                 |> SeqSet.fromList
                 |> SeqSet.toList
     in
-    Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
+    Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("🧑 Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
     DoExtra.eachCount charactersIds (\id -> getCharacterIcon authorization id) <| \charactersIcons ->
     let
         replyToPost : SeqDict (Id Reply) (Id PostDetails)
@@ -413,7 +413,7 @@ viewLinks appData =
                             pid
             in
             let
-                posts : List (Id PostDetails)
+                posts : SeqSet (Id PostDetails)
                 posts =
                     links
                         |> List.concatMap
@@ -422,10 +422,12 @@ viewLinks appData =
                                 , toPostId link.to
                                 ]
                             )
+                        |> SeqSet.fromList
 
                 nodes : Result (Html msg) String
                 nodes =
                     posts
+                        |> SeqSet.toList
                         |> Result.Extra.combineMap
                             (\pid ->
                                 let

@@ -1,5 +1,6 @@
 module GlowficApi.Extra exposing (getAllBoardsIdPosts, getBoard, getCharacter, getPost, login)
 
+import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
 import BackendTask.Env as Env
@@ -75,7 +76,7 @@ retryOn429 budget task =
                                     delta =
                                         Duration.from now resetAt
                                 in
-                                Do.log ("Hit a 429, sleeping for " ++ durationToString delta) <| \() ->
+                                Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("💤 Hit a 429, sleeping for " ++ durationToString delta)) <| \() ->
                                 Do.do (sleepAndLog delta) <| \() ->
                                 retryOn429 (budget - 1) task
 
@@ -304,7 +305,7 @@ getRefreshingIf refreshCondition label toTuple { token } { params } =
 
         Ok cached ->
             if refreshCondition cached then
-                Do.log ("Hit refresh condition for " ++ label ++ ", refreshing") <| \() ->
+                Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("♻️ Hit refresh condition for " ++ label ++ ", refreshing")) <| \() ->
                 getWith Http.ForceRevalidate
                     |> useCachedOn429 cached
                     |> BackendTask.allowFatal
