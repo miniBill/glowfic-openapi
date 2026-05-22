@@ -1,10 +1,12 @@
 module View.Post exposing (viewCharacter, viewCharacterNames, viewContent, viewIcon, viewNames, viewPermalink, viewPost, viewReply)
 
 import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
+import GlowficRoute
 import Html exposing (Html)
 import Html.Attributes
 import Html.Parser
 import Html.Parser.Util
+import Id exposing (Id(..))
 import Url
 
 
@@ -25,7 +27,7 @@ viewPost post =
             }
         , Html.div
             [ Html.Attributes.class "content" ]
-            (viewPermalink ("https://glowfic.com/posts/" ++ String.fromInt post.id)
+            (viewPermalink (GlowficRoute.post (Id post.id))
                 :: viewContent post
             )
         ]
@@ -38,7 +40,7 @@ viewReply reply =
         [ viewCharacter reply
         , Html.div
             [ Html.Attributes.class "content" ]
-            (viewPermalink ("https://glowfic.com/replies/" ++ String.fromInt reply.id)
+            (viewPermalink (GlowficRoute.reply (Id reply.id))
                 :: viewContent reply
             )
         ]

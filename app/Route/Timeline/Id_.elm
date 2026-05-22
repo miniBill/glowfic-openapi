@@ -12,6 +12,7 @@ import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Extra
 import GlowficApi.Types exposing (Board, Character, Icon, PostDetails, PostSummary, Reply)
+import GlowficRoute
 import Head
 import Head.Seo as Seo
 import Html exposing (Html)
@@ -23,7 +24,7 @@ import Maybe.Extra
 import OpenApi.Common
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
-import Parser
+import Parser exposing ((|.), (|=), Parser)
 import Parser.Error
 import Result.Extra
 import Rope exposing (Rope)
@@ -51,9 +52,11 @@ type alias Data =
     }
 
 
-type Link
-    = Symmetric MessageId MessageId
-    | Asymmetric { from : MessageId, to : MessageId }
+type alias Link =
+    { from : MessageId
+    , to : MessageId
+    , label : String
+    }
 
 
 type MessageId
@@ -183,7 +186,89 @@ calculateContentLinks from content =
             Err ( content, e )
 
         Ok parsed ->
+            parsed
+                |> Result.Extra.combineMap (calculateNodeLinks from)
+                |> Result.map Rope.fromRopeList
+
+
+calculateNodeLinks : MessageId -> Html.Parser.Node -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculateNodeLinks from node =
+    case node of
+        Html.Parser.Element "a" attrs children ->
+            case List.Extra.find (\( attrName, _ ) -> attrName == "href") attrs of
+                Just ( _, target ) ->
+                    case Parser.run targetParser target of
+                        Err e ->
+                            Err ( target, e )
+
+                        Ok Nothing ->
+                            Ok Rope.empty
+
+                        Ok (Just to) ->
+                            Ok (Rope.singleton { from = from, to = to, label = childrenToString children })
+
+                Nothing ->
+                    children
+                        |> Result.Extra.combineMap (calculateNodeLinks from)
+                        |> Result.map Rope.fromRopeList
+
+        Html.Parser.Element _ _ children ->
+            children
+                |> Result.Extra.combineMap (calculateNodeLinks from)
+                |> Result.map Rope.fromRopeList
+
+        Html.Parser.Text _ ->
             Ok Rope.empty
+
+        Html.Parser.Comment _ ->
+            Ok Rope.empty
+
+
+childrenToString : List Html.Parser.Node -> String
+childrenToString nodes =
+    String.concat (List.map nodeToString nodes)
+
+
+nodeToString : Html.Parser.Node -> String
+nodeToString node =
+    case node of
+        Html.Parser.Element _ _ children ->
+            childrenToString children
+
+        Html.Parser.Text t ->
+            t
+
+        Html.Parser.Comment _ ->
+            ""
+
+
+targetParser : Parser (Maybe MessageId)
+targetParser =
+    Parser.oneOf
+        [ Parser.succeed (\reply -> Just (MessageIdReply (Id.fromInt reply)))
+            |. Parser.oneOf
+                [ Parser.token "/replies/"
+                , Parser.token "https://glowfic.com/replies/"
+                ]
+            |= Parser.int
+            |. Parser.token "#reply-"
+            |. Parser.int
+        , Parser.succeed (\reply -> Just (MessageIdPost (Id.fromInt reply)))
+            |. Parser.oneOf
+                [ Parser.token "/posts/"
+                , Parser.token "https://glowfic.com/posts/"
+                ]
+            |= Parser.int
+        , Parser.succeed Nothing
+            |. Parser.oneOf
+                [ Parser.token "https://www.d20pfsrd.com/"
+                , Parser.token "https://www.aonprd.com/"
+                , Parser.token "https://en.wikipedia.org/"
+                , Parser.token "https://www.willowandroxas.com/"
+                ]
+            |. Parser.chompWhile (\_ -> True)
+        ]
+        |. Parser.end
 
 
 errorToHtml :
@@ -293,8 +378,31 @@ viewLinks linksResult =
 
         Ok links ->
             links
-                |> List.map (\link -> Html.li [] [ Html.text (Debug.toString link) ])
+                |> List.map
+                    (\link ->
+                        Html.li []
+                            [ viewLinkEndpoint link.from
+                            , Html.text (" => " ++ link.label ++ " => ")
+                            , viewLinkEndpoint link.to
+                            ]
+                    )
                 |> Html.ul []
+
+
+viewLinkEndpoint : MessageId -> Html msg
+viewLinkEndpoint id =
+    case id of
+        MessageIdPost pid ->
+            Html.a
+                [ Html.Attributes.href (GlowficRoute.post pid)
+                ]
+                [ Html.text ("Post: " ++ String.fromInt (Id.toInt pid)) ]
+
+        MessageIdReply rid ->
+            Html.a
+                [ Html.Attributes.href (GlowficRoute.reply rid)
+                ]
+                [ Html.text ("Reply: " ++ String.fromInt (Id.toInt rid)) ]
 
 
 viewPostSummary : Data -> PostDetails -> List Reply -> Html msg
@@ -305,7 +413,7 @@ viewPostSummary appData post replies =
             allCharactersIds ( post, replies )
     in
     [ Html.a
-        [ Html.Attributes.href ("https://glowfic.com/posts/" ++ String.fromInt post.id)
+        [ Html.Attributes.href (GlowficRoute.post (Id post.id))
         ]
         [ Html.text post.subject ]
     , charactersIds
@@ -360,7 +468,7 @@ viewPostSummary appData post replies =
                                 Just { id, url } ->
                                     Html.a
                                         [ Html.Attributes.class "icon"
-                                        , Html.Attributes.href ("https://glowfic.com/characters/" ++ String.fromInt (Id.toInt characterId))
+                                        , Html.Attributes.href (GlowficRoute.character characterId)
                                         , Html.Attributes.title characterName
                                         ]
                                         [ Html.img
