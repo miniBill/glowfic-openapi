@@ -207,14 +207,7 @@ viewPostSummary appData post replies =
     let
         charactersIds : SeqDict (Id Character) (SeqSet String)
         charactersIds =
-            allCharactersIds ( post, replies ) |> logIf
-
-        logIf =
-            if post.subject == "Vienna Opening" then
-                Debug.log "charactersIds"
-
-            else
-                identity
+            allCharactersIds ( post, replies )
     in
     [ Html.a
         [ Html.Attributes.href ("https://glowfic.com/posts/" ++ String.fromInt post.id)
@@ -262,7 +255,7 @@ viewPostSummary appData post replies =
                             ]
                             [ Html.text characterName ]
                 in
-                case SeqDict.get characterId appData.charactersIcons |> logIf of
+                case SeqDict.get characterId appData.charactersIcons of
                     Just { icon, npc } ->
                         if npc then
                             Nothing
