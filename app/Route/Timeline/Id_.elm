@@ -208,7 +208,7 @@ calculateNodeLinks replyToPost from node =
         Html.Parser.Element "a" attrs children ->
             case List.Extra.find (\( attrName, _ ) -> attrName == "href") attrs of
                 Just ( _, target ) ->
-                    case Parser.run (targetParser replyToPost) target of
+                    case Parser.run (targetParser replyToPost from) target of
                         Err e ->
                             Err ( target, e )
 
@@ -253,8 +253,8 @@ nodeToString node =
             ""
 
 
-targetParser : SeqDict (Id Reply) (Id PostDetails) -> Parser (Maybe MessageId)
-targetParser replyToPost =
+targetParser : SeqDict (Id Reply) (Id PostDetails) -> MessageId -> Parser (Maybe MessageId)
+targetParser replyToPost from =
     Parser.oneOf
         [ Parser.succeed Id.unsafe
             |. Parser.oneOf
@@ -271,8 +271,12 @@ targetParser replyToPost =
                             Parser.succeed (Just (MessageIdReply pid id))
 
                         Nothing ->
-                            ("Could not find post for reply id " ++ String.fromInt (Id.toInt id))
-                                |> Parser.problem
+                            if from == MessageIdReply (Id.unsafe 58782) (Id.unsafe 2596296) then
+                                Parser.succeed Nothing
+
+                            else
+                                ("While parsing " ++ messageIdToString from ++ ", could not find post for reply id " ++ String.fromInt (Id.toInt id))
+                                    |> Parser.problem
                 )
         , Parser.succeed (\reply -> Just (MessageIdPost (Id.unsafe reply)))
             |. Parser.oneOf
@@ -417,7 +421,7 @@ viewLinkEndpoint id =
             Html.a
                 [ Html.Attributes.href (GlowficRoute.post pid)
                 ]
-                [ "Post: {pid}"
+                [ "Post {pid}"
                     |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
                     |> Html.text
                 ]
@@ -426,11 +430,24 @@ viewLinkEndpoint id =
             Html.a
                 [ Html.Attributes.href (GlowficRoute.reply rid)
                 ]
-                [ "Reply: {rid} from post {pid}"
+                [ "Reply {rid} from post {pid}"
                     |> String.replace "{rid}" (String.fromInt (Id.toInt rid))
                     |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
                     |> Html.text
                 ]
+
+
+messageIdToString : MessageId -> String
+messageIdToString id =
+    case id of
+        MessageIdPost pid ->
+            "Post {pid}"
+                |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
+
+        MessageIdReply pid rid ->
+            "Reply {rid} from post {pid}"
+                |> String.replace "{rid}" (String.fromInt (Id.toInt rid))
+                |> String.replace "{pid}" (String.fromInt (Id.toInt pid))
 
 
 viewPostSummary : Data -> PostDetails -> List Reply -> Html msg
