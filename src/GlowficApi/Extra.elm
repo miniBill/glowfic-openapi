@@ -24,20 +24,34 @@ import Url exposing (Url)
 
 login : BackendTask FatalError { token : String }
 login =
-    BackendTask.map2 Tuple.pair
-        (Env.expect "username")
-        (Env.expect "password")
+    let
+        tokenPath : String
+        tokenPath =
+            ".elm-pages/http-response-cache/token"
+    in
+    File.rawFile tokenPath
+        |> BackendTask.map (\token -> { token = token })
         |> BackendTask.allowFatal
-        |> BackendTask.andThen
-            (\( username, password ) ->
-                GlowficApi.Api.login
-                    { body =
-                        { username = username
-                        , password = password
+        |> BackendTask.onError
+            (\_ ->
+                Do.allowFatal
+                    (BackendTask.map2 Tuple.pair
+                        (Env.expect "username")
+                        (Env.expect "password")
+                    )
+                <| \( username, password ) ->
+                Do.allowFatal
+                    (GlowficApi.Api.login
+                        { body =
+                            { username = username
+                            , password = password
+                            }
                         }
-                    }
-                    |> retryOn429 10
-                    |> BackendTask.allowFatal
+                        |> retryOn429 10
+                    )
+                <| \auth ->
+                Do.allowFatal (Script.writeFile { path = tokenPath, body = auth.token }) <| \_ ->
+                BackendTask.succeed auth
             )
 
 
