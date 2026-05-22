@@ -207,7 +207,14 @@ viewPostSummary appData post replies =
     let
         charactersIds : SeqDict (Id Character) (SeqSet String)
         charactersIds =
-            allCharactersIds ( post, replies )
+            allCharactersIds ( post, replies ) |> logIf
+
+        logIf =
+            if post.subject == "Vienna Opening" then
+                Debug.log "charactersIds"
+
+            else
+                identity
     in
     [ Html.a
         [ Html.Attributes.href ("https://glowfic.com/posts/" ++ String.fromInt post.id)
@@ -225,31 +232,8 @@ viewPostSummary appData post replies =
                             |> List.map String.trim
                             |> List.Extra.removeWhen String.isEmpty
                             |> String.join ", "
-                in
-                case SeqDict.get characterId appData.charactersIcons of
-                    Just { icon, npc } ->
-                        if npc then
-                            Nothing
 
-                        else
-                            icon
-                                |> Maybe.map
-                                    (\{ id, url } ->
-                                        Html.a
-                                            [ Html.Attributes.class "icon"
-                                            , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt (Id.toInt id))
-                                            , Html.Attributes.title characterName
-                                            ]
-                                            [ Html.img
-                                                [ Html.Attributes.style "width" "auto"
-                                                , Html.Attributes.style "height" "60px"
-                                                , Html.Attributes.src (Url.toString url)
-                                                ]
-                                                []
-                                            ]
-                                    )
-
-                    Nothing ->
+                    textStyle () =
                         Html.div
                             [ Html.Attributes.style "height" "60px"
 
@@ -259,7 +243,34 @@ viewPostSummary appData post replies =
                             , Html.Attributes.style "flex" "0 0 0"
                             ]
                             [ Html.text characterName ]
-                            |> Just
+                in
+                case SeqDict.get characterId appData.charactersIcons |> logIf of
+                    Just { icon, npc } ->
+                        if npc then
+                            Nothing
+
+                        else
+                            case icon of
+                                Just { id, url } ->
+                                    Html.a
+                                        [ Html.Attributes.class "icon"
+                                        , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt (Id.toInt id))
+                                        , Html.Attributes.title characterName
+                                        ]
+                                        [ Html.img
+                                            [ Html.Attributes.style "width" "auto"
+                                            , Html.Attributes.style "height" "60px"
+                                            , Html.Attributes.src (Url.toString url)
+                                            ]
+                                            []
+                                        ]
+                                        |> Just
+
+                                Nothing ->
+                                    Just (textStyle ())
+
+                    Nothing ->
+                        Just (textStyle ())
             )
         |> Html.div
             [ Html.Attributes.style "display" "flex"
