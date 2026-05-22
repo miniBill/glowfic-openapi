@@ -5,6 +5,8 @@ import BackendTask.Do as Do
 import BackendTask.Env as Env
 import BackendTask.File as File
 import BackendTask.Http as Http exposing (Body, Expect)
+import BackendTask.Time as Time
+import Dict
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Json
@@ -13,6 +15,7 @@ import Id exposing (Id(..))
 import Json.Decode
 import OpenApi.Common
 import Pages.Script as Script
+import Time as CoreTime
 import Triple.Extra exposing (from)
 import Url exposing (Url)
 
@@ -31,8 +34,38 @@ login =
                         , password = password
                         }
                     }
+                    |> retryOn429
                     |> BackendTask.allowFatal
             )
+
+
+retryOn429 :
+    BackendTask { a | recoverable : Http.Error } b
+    -> BackendTask { a | recoverable : Http.Error } b
+retryOn429 task =
+    BackendTask.onError
+        (\({ recoverable } as err) ->
+            case recoverable of
+                Http.BadStatus metadata body ->
+                    case Dict.get "ratelimit-reset" metadata.headers |> Maybe.andThen String.toInt of
+                        Just resetAt ->
+                            Do.do Time.now <| \now ->
+                            let
+                                delta : Int
+                                delta =
+                                    resetAt * 1000 - CoreTime.posixToMillis now
+                            in
+                            Do.log ("Hit a 429, sleeping for " ++ String.fromInt (delta // 1000) ++ "s") <| \() ->
+                            Do.do (Script.sleep delta) <| \() ->
+                            task
+
+                        Nothing ->
+                            BackendTask.fail err
+
+                _ ->
+                    BackendTask.fail err
+        )
+        task
 
 
 getCharacter : { token : String } -> Id t -> BackendTask FatalError CharacterDetails
@@ -164,4 +197,5 @@ getCachedWithAuthorization { token } toTuple { params } =
         , cachePath = Just ".elm-pages/http-response-cache"
         , cacheStrategy = Just Http.ForceCache
         }
+        |> retryOn429
         |> BackendTask.allowFatal
