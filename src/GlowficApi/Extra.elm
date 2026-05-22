@@ -7,6 +7,7 @@ import BackendTask.File as File
 import BackendTask.Http as Http exposing (Body, Expect)
 import BackendTask.Time as Time
 import Dict
+import Duration exposing (Duration)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Json
@@ -15,6 +16,7 @@ import Id exposing (Id(..))
 import Json.Decode
 import OpenApi.Common
 import Pages.Script as Script
+import Quantity
 import Time as CoreTime
 import Triple.Extra exposing (from)
 import Url exposing (Url)
@@ -52,16 +54,20 @@ retryOn429 budget task =
             (\({ recoverable } as err) ->
                 case recoverable of
                     Http.BadStatus metadata body ->
-                        case Dict.get "ratelimit-reset" metadata.headers |> Maybe.andThen String.toInt of
+                        case
+                            Dict.get "ratelimit-reset" metadata.headers
+                                |> Maybe.andThen String.toInt
+                                |> Maybe.map (\seconds -> CoreTime.millisToPosix (seconds * 1000))
+                        of
                             Just resetAt ->
                                 Do.do Time.now <| \now ->
                                 let
-                                    delta : Int
+                                    delta : Duration
                                     delta =
-                                        resetAt * 1000 - CoreTime.posixToMillis now
+                                        Duration.from now resetAt
                                 in
-                                Do.log ("Hit a 429, sleeping for " ++ String.fromInt (delta // 1000) ++ "s") <| \() ->
-                                Do.do (Script.sleep delta) <| \() ->
+                                Do.log ("Hit a 429, sleeping for " ++ durationToString delta) <| \() ->
+                                Do.do (sleepAndLog delta) <| \() ->
                                 retryOn429 (budget - 1) task
 
                             Nothing ->
@@ -71,6 +77,76 @@ retryOn429 budget task =
                         BackendTask.fail err
             )
             task
+
+
+sleepAndLog : Duration -> BackendTask e ()
+sleepAndLog milliseconds =
+    if milliseconds |> Quantity.lessThanOrEqualTo (Duration.seconds 10) then
+        Script.sleep (round (Duration.inMilliseconds milliseconds))
+
+    else
+        let
+            tenth : Duration
+            tenth =
+                milliseconds |> Quantity.divideBy 10
+
+            step : Float -> (() -> BackendTask e ()) -> BackendTask e ()
+            step i k =
+                Do.do (Script.sleep (round (Duration.inMilliseconds tenth))) <| \() ->
+                Do.log (" - " ++ durationToString (Quantity.multiplyBy i tenth) ++ " left") k
+        in
+        step 9 <| \() ->
+        step 8 <| \() ->
+        step 7 <| \() ->
+        step 6 <| \() ->
+        step 5 <| \() ->
+        step 4 <| \() ->
+        step 3 <| \() ->
+        step 2 <| \() ->
+        step 1 <| \() ->
+        sleepAndLog tenth
+
+
+durationToString : Duration -> String
+durationToString duration =
+    let
+        milliseconds : Int
+        milliseconds =
+            round (Duration.inMilliseconds duration)
+
+        day : Int
+        day =
+            24 * hour
+
+        hour : Int
+        hour =
+            60 * minute
+
+        minute : Int
+        minute =
+            60 * second
+
+        second : Int
+        second =
+            1000
+    in
+    if milliseconds >= day * 10 then
+        String.fromInt (milliseconds // day) ++ "d"
+
+    else if milliseconds >= day then
+        String.fromInt (milliseconds // day) ++ "d " ++ String.fromInt (milliseconds // hour |> modBy 24) ++ "h"
+
+    else if milliseconds >= hour then
+        String.fromInt (milliseconds // hour) ++ "h " ++ String.fromInt (milliseconds // minute |> modBy 60) ++ "m"
+
+    else if milliseconds >= minute then
+        String.fromInt (milliseconds // minute) ++ "m " ++ String.fromInt (milliseconds // second |> modBy 60) ++ "s"
+
+    else if milliseconds >= second then
+        String.fromInt (milliseconds // second) ++ "." ++ String.padLeft 3 '0' (String.fromInt (milliseconds |> modBy 1000)) ++ "s"
+
+    else
+        String.fromInt milliseconds ++ "ms"
 
 
 getCharacter : { token : String } -> Id t -> BackendTask FatalError CharacterDetails
