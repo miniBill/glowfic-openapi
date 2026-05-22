@@ -381,7 +381,7 @@ view app _ =
                 (\( _, ( post, replies ) ) ->
                     viewPostSummary app.data post replies
                 )
-            |> (::) (viewLinks app.data.links)
+            |> (::) (viewLinks app.data)
             |> Html.div
                 [ Html.Attributes.style "display" "flex"
                 , Html.Attributes.style "flex-wrap" "wrap"
@@ -395,23 +395,83 @@ view app _ =
     }
 
 
-viewLinks : Result ( String, List Parser.DeadEnd ) (List Link) -> Html msg
-viewLinks linksResult =
-    case linksResult of
+viewLinks : Data -> Html msg
+viewLinks appData =
+    case appData.links of
         Err ( content, deadEnds ) ->
             errorToHtml content deadEnds
 
         Ok links ->
-            links
-                |> List.map
-                    (\link ->
-                        Html.li []
-                            [ viewLinkEndpoint link.from
-                            , Html.text (" => " ++ link.label ++ " => ")
-                            , viewLinkEndpoint link.to
-                            ]
-                    )
-                |> Html.ul []
+            let
+                toPostId : MessageId -> Id PostDetails
+                toPostId messageId =
+                    case messageId of
+                        MessageIdPost pid ->
+                            pid
+
+                        MessageIdReply pid _ ->
+                            pid
+            in
+            let
+                posts : List (Id PostDetails)
+                posts =
+                    links
+                        |> List.concatMap
+                            (\link ->
+                                [ toPostId link.from
+                                , toPostId link.to
+                                ]
+                            )
+
+                nodes : Result (Html msg) String
+                nodes =
+                    posts
+                        |> Result.Extra.combineMap
+                            (\pid ->
+                                let
+                                    pidString =
+                                        String.fromInt (Id.toInt pid)
+                                in
+                                case SeqDict.get pid appData.posts of
+                                    Nothing ->
+                                        "Could not find post {pid}"
+                                            |> String.replace "{pid}" pidString
+                                            |> Html.text
+                                            |> Err
+
+                                    Just ( post, _ ) ->
+                                        (pidString ++ " " ++ post.subject)
+                                            |> Ok
+                            )
+                        |> Result.map (String.join "\n")
+
+                edges : Result (Html msg) String
+                edges =
+                    case appData.links of
+                        Err ( s, e ) ->
+                            Err (errorToHtml s e)
+
+                        Ok ls ->
+                            ls
+                                |> List.map
+                                    (\{ from, to, label } ->
+                                        [ String.fromInt (Id.toInt (toPostId from))
+                                        , String.fromInt (Id.toInt (toPostId to))
+                                        , label
+                                        ]
+                                            |> String.join " "
+                                    )
+                                |> String.join "\n"
+                                |> Ok
+            in
+            Html.pre []
+                [ case Result.map2 Tuple.pair nodes edges of
+                    Ok ( n, e ) ->
+                        Html.text (n ++ "\n#\n" ++ e)
+
+                    Err e ->
+                        e
+                ]
 
 
 viewLinkEndpoint : MessageId -> Html msg
