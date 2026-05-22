@@ -1,4 +1,4 @@
-module Shared exposing (Data, Model, Msg(..), SharedMsg, data, init, subscriptions, template, update, view)
+module Shared exposing (Data, Model, Msg, template)
 
 import BackendTask exposing (BackendTask)
 import Effect exposing (Effect)

@@ -10,16 +10,11 @@ import Dict
 import Duration exposing (Duration)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
-import GlowficApi.Json
-import GlowficApi.Types exposing (Board, Character, CharacterDetails, Icon, PostDetails, PostSummary, Reply)
-import Id exposing (Id(..))
-import Json.Decode
-import OpenApi.Common
+import GlowficApi.Types exposing (Board, CharacterDetails, PostDetails, PostSummary, Reply)
+import Id exposing (Id)
 import Pages.Script as Script
 import Quantity
 import Time as CoreTime
-import Triple.Extra exposing (from)
-import Url exposing (Url)
 
 
 login : BackendTask FatalError { token : String }
@@ -67,7 +62,7 @@ retryOn429 budget task =
         BackendTask.onError
             (\({ recoverable } as err) ->
                 case recoverable of
-                    Http.BadStatus metadata body ->
+                    Http.BadStatus metadata _ ->
                         case
                             Dict.get "ratelimit-reset" metadata.headers
                                 |> Maybe.andThen String.toInt
@@ -107,7 +102,7 @@ sleepAndLog milliseconds =
                     |> Quantity.max Duration.second
                     |> Quantity.min milliseconds
 
-            left : Quantity.Quantity Float Duration.Seconds
+            left : Duration
             left =
                 milliseconds |> Quantity.minus toSleep
         in

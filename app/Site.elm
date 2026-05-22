@@ -1,4 +1,4 @@
-module Site exposing (config, head)
+module Site exposing (config)
 
 import BackendTask exposing (BackendTask)
 import FatalError exposing (FatalError)

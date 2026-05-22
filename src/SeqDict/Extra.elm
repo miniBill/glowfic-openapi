@@ -1,4 +1,4 @@
-module SeqDict.Extra exposing (..)
+module SeqDict.Extra exposing (groupByWith)
 
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)

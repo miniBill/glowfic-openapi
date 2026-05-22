@@ -2,25 +2,20 @@ module Route.ChaserSixWhen exposing (ActionData, Data, Model, Msg, RouteParams, 
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
-import BackendTask.Env as Env
-import Dict exposing (Dict)
 import FatalError exposing (FatalError)
-import GlowficApi.Api
 import GlowficApi.Extra
-import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
+import GlowficApi.Types exposing (PostDetails, Reply)
 import Head
 import Head.Seo as Seo
 import Html exposing (Html)
 import Html.Attributes
 import Html.Parser
-import Html.Parser.Util
-import Id exposing (Id(..))
+import Id exposing (Id)
 import List.Extra
 import OpenApi.Common
 import Pages.Url
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
-import Url
 import UrlPath
 import View exposing (View)
 import View.Post
@@ -80,8 +75,9 @@ rootPost =
 
 data : BackendTask FatalError Data
 data =
-    Do.do GlowficApi.Extra.login <| \token ->
-    go token [ rootPost ] SeqDict.empty
+    Do.do GlowficApi.Extra.login <|
+        \token ->
+            go token [ rootPost ] SeqDict.empty
 
 
 go : { token : String } -> List (Id PostDetails) -> Data -> BackendTask FatalError Data

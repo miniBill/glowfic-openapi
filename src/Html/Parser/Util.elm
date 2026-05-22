@@ -1,4 +1,4 @@
-module Html.Parser.Util exposing (toAttribute, toVirtualDom, toVirtualDomEach)
+module Html.Parser.Util exposing (toVirtualDom)
 
 {-| Converts nodes to virtual dom nodes.
 -}

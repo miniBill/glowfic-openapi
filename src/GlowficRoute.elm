@@ -1,7 +1,7 @@
 module GlowficRoute exposing (character, post, reply)
 
 import GlowficApi.Types exposing (Character, PostDetails, Reply)
-import Id exposing (Id(..))
+import Id exposing (Id)
 
 
 reply : Id Reply -> String
