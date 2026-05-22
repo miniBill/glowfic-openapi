@@ -187,7 +187,7 @@ getPost authorization (Id id) =
                                 GlowficApi.Api.getPostsIdRepliesRecord
                                 { params =
                                     { id = id
-                                    , page = Just page
+                                    , page = Just (page + 1)
                                     , per_page = Just 100
                                     }
                                 }
