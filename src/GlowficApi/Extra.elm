@@ -333,6 +333,7 @@ useCachedOn429 cached task =
             case recoverable of
                 Http.BadStatus metadata _ ->
                     if metadata.statusCode == 429 then
+                        Do.log (Ansi.Color.fontColor Ansi.Color.cyan "⚠️ Refreshing failed with a 429, using cached") <| \() ->
                         BackendTask.succeed cached
 
                     else
