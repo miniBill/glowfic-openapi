@@ -122,7 +122,7 @@ viewCharacterNames reply =
 
 viewContent : { a | content : String } -> List (Html msg)
 viewContent reply =
-    case Html.Parser.run reply.content of
+    case Html.Parser.run Html.Parser.allCharRefs reply.content of
         Err _ ->
             [ Html.text reply.content ]
 

@@ -16,12 +16,17 @@ import Head
 import Head.Seo as Seo
 import Html exposing (Html)
 import Html.Attributes
+import Html.Parser
 import Id exposing (Id(..))
 import List.Extra
 import Maybe.Extra
 import OpenApi.Common
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
+import Parser
+import Parser.Error
+import Result.Extra
+import Rope exposing (Rope)
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
 import SeqDict.Extra
@@ -42,7 +47,18 @@ type alias Data =
     { name : String
     , posts : SeqDict (Id PostDetails) ( PostDetails, List Reply )
     , charactersIcons : SeqDict (Id Character) { icon : Maybe { id : Id Icon, url : Url }, npc : Bool }
+    , links : Result ( String, List Parser.DeadEnd ) (List Link)
     }
+
+
+type Link
+    = Symmetric MessageId MessageId
+    | Asymmetric { from : MessageId, to : MessageId }
+
+
+type MessageId
+    = MessageIdReply (Id Reply)
+    | MessageIdPost (Id PostDetails)
 
 
 type alias Model =
@@ -125,9 +141,75 @@ data params =
                 )
             |> SeqDict.fromList
     , name = board.name
+    , links = calculatePostsLinks posts
     }
         |> Response.render
         |> BackendTask.succeed
+
+
+calculatePostsLinks : List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List Link)
+calculatePostsLinks posts =
+    posts
+        |> Result.Extra.combineMap calculatePostLinks
+        |> Result.map
+            (\rs ->
+                rs
+                    |> Rope.fromRopeList
+                    |> Rope.toList
+            )
+
+
+calculatePostLinks : ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculatePostLinks ( post, replies ) =
+    Result.map2 Rope.appendTo
+        (calculatePostDetailsLinks post)
+        (Result.map Rope.fromRopeList (Result.Extra.combineMap calculateReplyLinks replies))
+
+
+calculatePostDetailsLinks : PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculatePostDetailsLinks { id, content } =
+    calculateContentLinks (MessageIdPost (Id.fromInt id)) content
+
+
+calculateReplyLinks : Reply -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculateReplyLinks { id, content } =
+    calculateContentLinks (MessageIdReply (Id.fromInt id)) content
+
+
+calculateContentLinks : MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculateContentLinks from content =
+    case Html.Parser.run Html.Parser.noCharRefs content of
+        Err e ->
+            Err ( content, e )
+
+        Ok parsed ->
+            Ok Rope.empty
+
+
+errorToHtml :
+    String
+    -> List Parser.DeadEnd
+    -> Html msg
+errorToHtml src deadEnds =
+    let
+        color : String -> Html msg -> Html msg
+        color value child =
+            Html.span [ Html.Attributes.style "color" value ] [ child ]
+    in
+    Parser.Error.renderError
+        { text = Html.text
+        , formatContext = color "cyan"
+        , formatCaret = color "red"
+        , newline = Html.br [] []
+        , linesOfExtraContext = 3
+        }
+        Parser.Error.forParser
+        src
+        deadEnds
+        |> Html.pre
+            [ Html.Attributes.style "overflow" "scroll"
+            , Html.Attributes.style "max-width" "calc(100vw-16px)"
+            ]
 
 
 getCharacterIcon :
@@ -189,6 +271,7 @@ view app model =
                 (\( _, ( post, replies ) ) ->
                     viewPostSummary app.data post replies
                 )
+            |> (::) (viewLinks app.data.links)
             |> Html.div
                 [ Html.Attributes.style "display" "flex"
                 , Html.Attributes.style "flex-wrap" "wrap"
@@ -200,6 +283,18 @@ view app model =
                 ]
             |> List.singleton
     }
+
+
+viewLinks : Result ( String, List Parser.DeadEnd ) (List Link) -> Html msg
+viewLinks linksResult =
+    case linksResult of
+        Err ( content, deadEnds ) ->
+            errorToHtml content deadEnds
+
+        Ok links ->
+            links
+                |> List.map (\link -> Html.li [] [ Html.text (Debug.toString link) ])
+                |> Html.ul []
 
 
 viewPostSummary : Data -> PostDetails -> List Reply -> Html msg
@@ -265,7 +360,7 @@ viewPostSummary appData post replies =
                                 Just { id, url } ->
                                     Html.a
                                         [ Html.Attributes.class "icon"
-                                        , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt (Id.toInt id))
+                                        , Html.Attributes.href ("https://glowfic.com/characters/" ++ String.fromInt (Id.toInt characterId))
                                         , Html.Attributes.title characterName
                                         ]
                                         [ Html.img

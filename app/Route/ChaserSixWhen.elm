@@ -217,7 +217,7 @@ viewReplies posts replies =
 
 findLink : String -> Maybe (Id PostDetails)
 findLink content =
-    case Html.Parser.run content of
+    case Html.Parser.run Html.Parser.allCharRefs content of
         Ok nodes ->
             List.Extra.findMap findPostLink nodes
 
