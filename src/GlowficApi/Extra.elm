@@ -83,7 +83,16 @@ retryOn429 budget task =
                             Nothing ->
                                 BackendTask.fail err
 
-                    _ ->
+                    Http.BadUrl _ ->
+                        BackendTask.fail err
+
+                    Http.Timeout ->
+                        BackendTask.fail err
+
+                    Http.NetworkError ->
+                        BackendTask.fail err
+
+                    Http.BadBody _ _ ->
                         BackendTask.fail err
             )
             task
@@ -329,7 +338,16 @@ useCachedOn429 cached task =
                     else
                         BackendTask.fail err
 
-                _ ->
+                Http.BadUrl _ ->
+                    BackendTask.fail err
+
+                Http.Timeout ->
+                    BackendTask.fail err
+
+                Http.NetworkError ->
+                    BackendTask.fail err
+
+                Http.BadBody _ _ ->
                     BackendTask.fail err
         )
         task

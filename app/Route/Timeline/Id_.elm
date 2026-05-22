@@ -20,7 +20,6 @@ import Maybe.Extra
 import OpenApi.Common
 import Pages.Url
 import Parser exposing ((|.), (|=), Parser)
-import Parser.Error
 import Result.Extra
 import Rope exposing (Rope)
 import RouteBuilder exposing (App, StatelessRoute)
@@ -296,32 +295,6 @@ targetParser replyToPost from =
         |. Parser.end
 
 
-errorToHtml :
-    String
-    -> List Parser.DeadEnd
-    -> Html msg
-errorToHtml src deadEnds =
-    let
-        color : String -> Html msg -> Html msg
-        color value child =
-            Html.span [ Html.Attributes.style "color" value ] [ child ]
-    in
-    Parser.Error.renderError
-        { text = Html.text
-        , formatContext = color "cyan"
-        , formatCaret = color "red"
-        , newline = Html.br [] []
-        , linesOfExtraContext = 3
-        }
-        Parser.Error.forParser
-        src
-        deadEnds
-        |> Html.pre
-            [ Html.Attributes.style "overflow" "scroll"
-            , Html.Attributes.style "max-width" "calc(100vw-16px)"
-            ]
-
-
 getCharacterIcon :
     { token : String }
     -> Id Character
@@ -381,7 +354,6 @@ view app _ =
                 (\( _, ( post, replies ) ) ->
                     viewPostSummary app.data post replies
                 )
-            |> (::) (viewLinks app.data)
             |> Html.div
                 [ Html.Attributes.style "display" "flex"
                 , Html.Attributes.style "flex-wrap" "wrap"
@@ -395,108 +367,97 @@ view app _ =
     }
 
 
-viewLinks : Data -> Html msg
-viewLinks appData =
-    case appData.links of
-        Err ( content, deadEnds ) ->
-            errorToHtml content deadEnds
 
-        Ok links ->
-            let
-                toPostId : MessageId -> Id PostDetails
-                toPostId messageId =
-                    case messageId of
-                        MessageIdPost pid ->
-                            pid
-
-                        MessageIdReply pid _ ->
-                            pid
-            in
-            let
-                posts : SeqSet (Id PostDetails)
-                posts =
-                    links
-                        |> List.concatMap
-                            (\link ->
-                                [ toPostId link.from
-                                , toPostId link.to
-                                ]
-                            )
-                        |> SeqSet.fromList
-
-                nodes : Result (Html msg) String
-                nodes =
-                    posts
-                        |> SeqSet.toList
-                        |> Result.Extra.combineMap
-                            (\pid ->
-                                let
-                                    pidString =
-                                        Id.toString pid
-                                in
-                                case SeqDict.get pid appData.posts of
-                                    Nothing ->
-                                        "Could not find post {pid}"
-                                            |> String.replace "{pid}" pidString
-                                            |> Html.text
-                                            |> Err
-
-                                    Just ( post, _ ) ->
-                                        (pidString ++ " " ++ post.subject)
-                                            |> Ok
-                            )
-                        |> Result.map (String.join "\n")
-
-                edges : Result (Html msg) String
-                edges =
-                    case appData.links of
-                        Err ( s, e ) ->
-                            Err (errorToHtml s e)
-
-                        Ok ls ->
-                            ls
-                                |> List.map
-                                    (\{ from, to, label } ->
-                                        [ Id.toString (toPostId from)
-                                        , Id.toString (toPostId to)
-                                        , label
-                                        ]
-                                            |> String.join " "
-                                    )
-                                |> String.join "\n"
-                                |> Ok
-            in
-            Html.pre []
-                [ case Result.map2 Tuple.pair nodes edges of
-                    Ok ( n, e ) ->
-                        Html.text (n ++ "\n#\n" ++ e)
-
-                    Err e ->
-                        e
-                ]
-
-
-viewLinkEndpoint : MessageId -> Html msg
-viewLinkEndpoint id =
-    case id of
-        MessageIdPost pid ->
-            Html.a
-                [ Html.Attributes.href (GlowficRoute.post pid)
-                ]
-                [ "Post {pid}"
-                    |> String.replace "{pid}" (Id.toString pid)
-                    |> Html.text
-                ]
-
-        MessageIdReply pid rid ->
-            Html.a
-                [ Html.Attributes.href (GlowficRoute.reply rid)
-                ]
-                [ "Reply {rid} from post {pid}"
-                    |> String.replace "{rid}" (Id.toString rid)
-                    |> String.replace "{pid}" (Id.toString pid)
-                    |> Html.text
-                ]
+-- viewLinksAsGraph : Data -> Html msg
+-- viewLinksAsGraph appData =
+--     case appData.links of
+--         Err ( content, deadEnds ) ->
+--             errorToHtml content deadEnds
+--         Ok links ->
+--             let
+--                 toPostId : MessageId -> Id PostDetails
+--                 toPostId messageId =
+--                     case messageId of
+--                         MessageIdPost pid ->
+--                             pid
+--                         MessageIdReply pid _ ->
+--                             pid
+--                 posts : SeqSet (Id PostDetails)
+--                 posts =
+--                     links
+--                         |> List.concatMap
+--                             (\link ->
+--                                 [ toPostId link.from
+--                                 , toPostId link.to
+--                                 ]
+--                             )
+--                         |> SeqSet.fromList
+--                 nodes : Result (Html msg) String
+--                 nodes =
+--                     posts
+--                         |> SeqSet.toList
+--                         |> Result.Extra.combineMap
+--                             (\pid ->
+--                                 let
+--                                     pidString =
+--                                         Id.toString pid
+--                                 in
+--                                 case SeqDict.get pid appData.posts of
+--                                     Nothing ->
+--                                         "Could not find post {pid}"
+--                                             |> String.replace "{pid}" pidString
+--                                             |> Err
+--                                     Just ( post, _ ) ->
+--                                         (pidString ++ " " ++ post.subject)
+--                                             |> Ok
+--                             )
+--                         |> Result.map (String.join "\n")
+--                         |> Result.mapError Html.text
+--                 edges : Result (Html msg) String
+--                 edges =
+--                     case appData.links of
+--                         Err ( s, e ) ->
+--                             Err (errorToHtml s e)
+--                         Ok ls ->
+--                             ls
+--                                 |> List.map
+--                                     (\{ from, to, label } ->
+--                                         [ Id.toString (toPostId from)
+--                                         , Id.toString (toPostId to)
+--                                         , label
+--                                         ]
+--                                             |> String.join " "
+--                                     )
+--                                 |> String.join "\n"
+--                                 |> Ok
+--             in
+--             Html.pre []
+--                 [ case Result.map2 Tuple.pair nodes edges of
+--                     Ok ( n, e ) ->
+--                         Html.text (n ++ "\n#\n" ++ e)
+--                     Err e ->
+--                         e
+--                 ]
+-- viewLinkEndpoint : MessageId -> Html msg
+-- viewLinkEndpoint id =
+--     case id of
+--         MessageIdPost pid ->
+--             Html.a
+--                 [ Html.Attributes.href (GlowficRoute.post pid)
+--                 ]
+--                 [ "Post {pid}"
+--                     |> String.replace "{pid}" (Id.toString pid)
+--                     |> Html.text
+--                 ]
+--         MessageIdReply pid rid ->
+--             Html.a
+--                 [ Html.Attributes.href (GlowficRoute.reply rid)
+--                 ]
+--                 [ "Reply {rid} from post {pid}"
+--                     |> String.replace "{rid}" (Id.toString rid)
+--                     |> String.replace "{pid}" (Id.toString pid)
+--                     |> Html.text
+--                 ]
 
 
 messageIdToString : MessageId -> String

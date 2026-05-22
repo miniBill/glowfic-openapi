@@ -1,4 +1,4 @@
-module Effect exposing (Effect(..), batch, fromCmd, map, none, perform)
+module Effect exposing (Effect, batch, fromCmd, map, none, perform)
 
 
 type Effect msg
