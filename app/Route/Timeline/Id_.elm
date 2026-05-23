@@ -4,6 +4,7 @@ import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
 import BackendTask.Do.Extra as DoExtra
+import Color.Oklch as Oklch exposing (Oklch)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import GlowficApi.Extra
@@ -27,6 +28,7 @@ import SeqDict exposing (SeqDict)
 import SeqDict.Extra
 import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
+import String.Extra
 import Url exposing (Url)
 import UrlPath
 import View exposing (View)
@@ -39,8 +41,18 @@ type alias ActionData =
 type alias Data =
     { name : String
     , posts : SeqDict (Id PostDetails) ( PostDetails, List Reply )
-    , characters : SeqDict (Id Character) { name : String, icon : Maybe { id : Id Icon, url : Url } }
+    , characters :
+        SeqDict
+            (Id Character)
+            CharacterSummary
     , links : Result ( String, List Parser.DeadEnd ) (List Link)
+    }
+
+
+type alias CharacterSummary =
+    { name : String
+    , color : Oklch
+    , icon : Maybe { id : Id Icon, url : Url }
     }
 
 
@@ -126,7 +138,7 @@ data params =
                 |> SeqSet.toList
     in
     Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("🧑 Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
-    DoExtra.eachCountWithCircuitBreaker break4 charactersIds (\brk id -> getCharacter brk authorization id) <| \( characters, _ ) ->
+    DoExtra.eachCountWithCircuitBreaker break4 (assignColors charactersIds) (\brk ( id, color ) -> getCharacter brk authorization id color) <| \( characters, _ ) ->
     let
         replyToPost : SeqDict (Id Reply) (Id PostDetails)
         replyToPost =
@@ -161,6 +173,16 @@ data params =
     result
         |> Response.render
         |> BackendTask.succeed
+
+
+assignColors : List id -> List ( id, Oklch )
+assignColors list =
+    let
+        len : Float
+        len =
+            toFloat (List.length list)
+    in
+    List.indexedMap (\i e -> ( e, Oklch.oklch 0.7 0.2 (toFloat i / len) )) list
 
 
 calculatePostsLinks : SeqDict (Id Reply) (Id PostDetails) -> List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List Link)
@@ -306,13 +328,14 @@ getCharacter :
     { got429 : Bool }
     -> { token : String }
     -> Id Character
+    -> Oklch
     ->
         BackendTask
             FatalError
-            ( Maybe ( Id Character, { name : String, icon : Maybe { id : Id Icon, url : Url } } )
+            ( Maybe ( Id Character, CharacterSummary )
             , { got429 : Bool }
             )
-getCharacter got429 authorization id =
+getCharacter got429 authorization id color =
     GlowficApi.Extra.getCharacter got429 authorization id
         |> BackendTask.map
             (\( character, newGot429 ) ->
@@ -323,6 +346,7 @@ getCharacter got429 authorization id =
                     Just
                         ( id
                         , { name = character.name
+                          , color = color
                           , icon =
                                 case character.default_icon of
                                     OpenApi.Common.Null ->
@@ -395,29 +419,81 @@ view app _ =
                 SeqDict.keys app.data.posts
                     |> List.map (\id -> "[p" ++ Id.toString id ++ "-start] auto")
         in
-        app.data.posts
-            |> SeqDict.values
-            |> List.concatMap
-                (\( post, replies ) ->
-                    viewPostCharacters app.data post replies
-                )
-            |> (++) (viewPostTitles app.data)
-            |> (++) (viewCharacterNames app.data)
-            |> Html.div
-                [ Html.Attributes.style "display" "grid"
-                , Html.Attributes.style "gap" "8px"
-                , Html.Attributes.style "padding" "8px"
-                , Html.Attributes.style "color" "#f3f3f3"
-                , Html.Attributes.style "background" "#211e2f"
-                , Html.Attributes.style "overflow" "scroll"
-                , Html.Attributes.style "max-width" "100vw"
-                , Html.Attributes.style "grid-template-columns"
-                    (String.join " " ("[post-name-start] auto" :: columns))
-                , Html.Attributes.style "grid-template-rows"
-                    (String.join " " ("[character-name-start] auto" :: rows))
-                ]
-            |> List.singleton
+        [ Html.div
+            [ Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "color" "#f3f3f3"
+            , Html.Attributes.style "background" "#211e2f"
+            , Html.Attributes.style "gap" "8px"
+            ]
+            [ app.data.posts
+                |> SeqDict.values
+                |> List.concatMap
+                    (\( post, replies ) ->
+                        viewPostCharacters app.data post replies
+                    )
+                |> (++) (viewPostTitles app.data)
+                |> (++) (viewCharacterNames app.data)
+                |> Html.div
+                    [ Html.Attributes.style "display" "grid"
+                    , Html.Attributes.style "flex" "1"
+                    , Html.Attributes.style "gap" "8px"
+                    , Html.Attributes.style "padding" "8px"
+                    , Html.Attributes.style "overflow" "scroll"
+                    , Html.Attributes.style "max-width" "100vw"
+                    , Html.Attributes.style "grid-template-rows"
+                        (String.join " " ("[post-name-start] auto" :: columns))
+                    , Html.Attributes.style "grid-template-columns"
+                        (String.join " " ("[character-name-start] auto" :: rows))
+                    ]
+            , viewCharacters app.data.characters
+            ]
+        ]
     }
+
+
+viewCharacters : SeqDict (Id Character) CharacterSummary -> Html msg
+viewCharacters characters =
+    characters
+        |> SeqDict.toList
+        |> List.concatMap viewCharacter
+        |> Html.div
+            [ Html.Attributes.style "display" "grid"
+            , Html.Attributes.style "grid-template-columns" "40px auto"
+            , Html.Attributes.style "gap" "8px"
+            , Html.Attributes.style "width" "200px"
+            ]
+
+
+viewCharacter : ( Id Character, CharacterSummary ) -> List (Html msg)
+viewCharacter ( characterId, { name, icon, color } ) =
+    [ case icon of
+        Just { url } ->
+            Html.a
+                [ Html.Attributes.class "icon"
+                , Html.Attributes.href (GlowficRoute.character characterId)
+                , Html.Attributes.title name
+                , Html.Attributes.style "display" "block"
+                ]
+                [ Html.img
+                    [ Html.Attributes.style "width" "100%"
+                    , Html.Attributes.style "height" "auto"
+                    , Html.Attributes.src (Url.toString url)
+                    ]
+                    []
+                ]
+
+        Nothing ->
+            Html.div [] []
+    , Html.div
+        [ Html.Attributes.style "background" (Oklch.toCssString color)
+        , if color.lightness > 0.5 then
+            Html.Attributes.style "color" "black"
+
+          else
+            Html.Attributes.style "color" "white"
+        ]
+        [ Html.text name ]
+    ]
 
 
 viewCharacterNames : Data -> List (Html msg)
@@ -425,12 +501,18 @@ viewCharacterNames appData =
     appData.characters
         |> SeqDict.toList
         |> List.map
-            (\( id, { name } ) ->
+            (\( id, { name, color } ) ->
                 Html.a
                     [ Html.Attributes.href (GlowficRoute.character id)
                     , Html.Attributes.style "display" "block"
-                    , Html.Attributes.style "grid-row-start" "character-name-start"
-                    , Html.Attributes.style "grid-column-start" ("c" ++ Id.toString id ++ "-start")
+                    , Html.Attributes.style "grid-column-start" "character-name-start"
+                    , Html.Attributes.style "grid-row-start" ("c" ++ Id.toString id ++ "-start")
+                    , Html.Attributes.style "background" (Oklch.toCssString color)
+                    , if color.lightness > 0.5 then
+                        Html.Attributes.style "color" "black"
+
+                      else
+                        Html.Attributes.style "color" "white"
                     ]
                     [ Html.text name ]
             )
@@ -445,10 +527,13 @@ viewPostTitles appData =
                 Html.a
                     [ Html.Attributes.href (GlowficRoute.post (Id.for post))
                     , Html.Attributes.style "display" "block"
-                    , Html.Attributes.style "grid-column-start" "post-name-start"
-                    , Html.Attributes.style "grid-row-start" ("p" ++ String.fromInt post.id ++ "-start")
+                    , Html.Attributes.style "grid-row-start" "post-name-start"
+                    , Html.Attributes.style "grid-column-start" ("p" ++ String.fromInt post.id ++ "-start")
+                    , Html.Attributes.style "writing-mode" "vertical-rl"
+                    , Html.Attributes.style "text-orientation" "mixed"
                     ]
-                    [ Html.text post.subject ]
+                    [ Html.text (String.Extra.ellipsis (String.length "Eighty-Eight Million Eight Hundred and Eighty-Eight Tho") post.subject)
+                    ]
             )
 
 
@@ -586,58 +671,16 @@ viewPostCharacters appData post replies =
                     ( Just _, Just _ ) ->
                         EQ
             )
-        |> List.filterMap
+        |> List.map
             (\( characterId, characterNames ) ->
-                let
-                    placeAttrs : List (Attribute msg)
-                    placeAttrs =
-                        [ Html.Attributes.style "grid-column-start" ("c" ++ Id.toString characterId ++ "-start")
-                        , Html.Attributes.style "grid-row-start" ("p" ++ String.fromInt post.id ++ "-start")
-                        ]
-
-                    characterName : String
-                    characterName =
-                        characterNames
-                            |> SeqSet.toList
-                            |> List.map String.trim
-                            |> List.Extra.removeWhen String.isEmpty
-                            |> String.join ", "
-
-                    textStyle () =
-                        Html.div
-                            ([ Html.Attributes.style "height" "60px"
-                             , Html.Attributes.style "width" "120px"
-                             , Html.Attributes.style "border" "1px solid white"
-                             , Html.Attributes.style "padding" "4px"
-                             ]
-                                ++ placeAttrs
-                            )
-                            [ Html.text characterName ]
-                in
-                case SeqDict.get characterId appData.characters of
-                    Just { icon } ->
-                        case icon of
-                            Just { url } ->
-                                Html.a
-                                    ([ Html.Attributes.class "icon"
-                                     , Html.Attributes.href (GlowficRoute.character characterId)
-                                     , Html.Attributes.title characterName
-                                     , Html.Attributes.style "display" "block"
-                                     ]
-                                        ++ placeAttrs
-                                    )
-                                    [ Html.img
-                                        [ Html.Attributes.style "width" "auto"
-                                        , Html.Attributes.style "height" "60px"
-                                        , Html.Attributes.src (Url.toString url)
-                                        ]
-                                        []
-                                    ]
-                                    |> Just
-
-                            Nothing ->
-                                Just (textStyle ())
-
-                    Nothing ->
-                        Just (textStyle ())
+                Html.div
+                    [ -- Html.Attributes.style "height" "60px"
+                      -- , Html.Attributes.style "width" "10px"
+                      -- ,
+                      Html.Attributes.style "border" "1px solid white"
+                    , Html.Attributes.style "padding" "4px"
+                    , Html.Attributes.style "grid-row-start" ("c" ++ Id.toString characterId ++ "-start")
+                    , Html.Attributes.style "grid-column-start" ("p" ++ String.fromInt post.id ++ "-start")
+                    ]
+                    [ Html.text "X" ]
             )
