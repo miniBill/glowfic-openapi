@@ -242,7 +242,15 @@ viewAnnotation annotation =
             let
                 newId : Int
                 newId =
-                    Maybe.withDefault idInt (String.toInt newIdString)
+                    -- Allow posting a full link, just grab the digits at the end
+                    newIdString
+                        |> String.toList
+                        |> List.reverse
+                        |> List.Extra.takeWhile Char.isDigit
+                        |> List.reverse
+                        |> String.fromList
+                        |> String.toInt
+                        |> Maybe.withDefault idInt
             in
             case annotation of
                 Enter _ ->
