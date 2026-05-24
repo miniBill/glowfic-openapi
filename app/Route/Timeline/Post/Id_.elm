@@ -1,7 +1,9 @@
-module Route.Timeline.Post.Id_ exposing (ActionData, Data, MessageId, Model, Msg, RouteParams, route)
+module Route.Timeline.Post.Id_ exposing (ActionData, Data, Model, Msg, RouteParams, route)
 
+import Annotation exposing (Annotation)
 import BackendTask exposing (BackendTask)
 import Color.Oklch exposing (Oklch)
+import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import GlowficApi.Extra
@@ -9,16 +11,17 @@ import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply)
 import Head
 import Head.Seo as Seo
 import Http
-import Id exposing (Id, PostId)
+import Id exposing (CharacterId, Id, PostId, ReplyId)
 import Monad exposing (Monad)
 import Monad.Do as Do
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
 import Parser
-import RouteBuilder exposing (App, StatelessRoute)
+import RouteBuilder exposing (App, StatefulRoute, StatelessRoute)
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
+import Shared
 import Url exposing (Url)
 import UrlPath
 import View exposing (View)
@@ -30,20 +33,11 @@ type alias ActionData =
 
 
 type alias Data =
-    { name : String
-    , post : ( PostDetails, List Reply )
-    , enter : SeqDict (Id Reply) (SeqSet (Id Character))
-    , exit : SeqDict (Id Reply) (SeqSet (Id Character))
-    }
-
-
-type MessageId
-    = MessageIdReply (Id PostDetails) (Id Reply)
-    | MessageIdPost (Id PostDetails)
+    ( PostDetails, List Reply )
 
 
 type alias Model =
-    {}
+    { annotations : SeqDict (Id ReplyId) (List Annotation) }
 
 
 type alias Msg =
@@ -54,14 +48,36 @@ type alias RouteParams =
     { id : String }
 
 
-route : StatelessRoute RouteParams Data ActionData
+route : StatefulRoute RouteParams Data ActionData Model Msg
 route =
     RouteBuilder.preRenderWithFallback
         { head = head
         , data = data
         , pages = BackendTask.succeed []
         }
-        |> RouteBuilder.buildNoState { view = view }
+        |> RouteBuilder.buildWithLocalState
+            { view = view
+            , init = init
+            , subscriptions = subscriptions
+            , update = update
+            }
+
+
+init : App Data ActionData RouteParams -> Shared.Model -> ( Model, Effect Msg )
+init _ _ =
+    ( { annotations = SeqDict.empty }, Effect.none )
+
+
+subscriptions : RouteParams -> UrlPath.UrlPath -> Shared.Model -> Model -> Sub Msg
+subscriptions arg1 arg2 arg3 arg4 =
+    Sub.none
+
+
+update : App Data ActionData RouteParams -> Shared.Model -> Msg -> Model -> ( Model, Effect Msg )
+update app shared msg model =
+    case msg of
+        () ->
+            ( model, Effect.none )
 
 
 head : App Data ActionData RouteParams -> List Head.Tag
@@ -105,17 +121,11 @@ monad params =
         )
     <| \postId ->
     Do.do (GlowficApi.Extra.getPost postId) <| \post ->
-    { name = ""
-    , post = post
-    , enter = SeqDict.empty
-    , exit = SeqDict.empty
-    }
-        |> Response.render
-        |> Monad.succeed
+    Monad.succeed (Response.render post)
 
 
-view : RouteBuilder.App Data ActionData RouteParams -> Model -> View (PagesMsg ())
-view app model =
-    { title = (Tuple.first app.data.post).subject
-    , body = [ View.Post.viewThread app.data.post ]
+view : RouteBuilder.App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg ())
+view app _ model =
+    { title = (Tuple.first app.data).subject
+    , body = [ View.Post.viewThread app.data ]
     }
