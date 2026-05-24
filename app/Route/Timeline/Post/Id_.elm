@@ -5,6 +5,7 @@ import BackendTask exposing (BackendTask)
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
+import Glowfic.Utils
 import GlowficApi.Extra
 import GlowficApi.Types exposing (PostDetails, Reply)
 import Head
@@ -13,8 +14,9 @@ import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Events
 import Html.Parser
-import Id exposing (Id, PostId, ReplyId)
+import Id exposing (CharacterId, Id, PostId, ReplyId)
 import List.Extra
+import Maybe.Extra
 import Monad exposing (Monad)
 import Monad.Do as Do
 import Pages.Url
@@ -25,6 +27,7 @@ import Result.Extra
 import Rope exposing (Rope)
 import RouteBuilder exposing (App, StatefulRoute)
 import SeqDict exposing (SeqDict)
+import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
 import Shared
 import UrlPath exposing (UrlPath)
@@ -154,6 +157,11 @@ view app _ model =
 
 viewThread : Model -> ( PostDetails, List Reply ) -> Html Msg
 viewThread model ( post, replies ) =
+    let
+        characters : SeqDict (Id CharacterId) (SeqSet String)
+        characters =
+            Glowfic.Utils.allCharactersIds ( post, replies )
+    in
     Html.div
         [ Html.Attributes.class "thread"
         , Html.Attributes.style "color" "#f3f3f3"
@@ -165,19 +173,19 @@ viewThread model ( post, replies ) =
         ]
         (View.Post.viewHeader [ Html.Attributes.style "grid-column" "1 / span 2" ] post
             :: View.Post.viewTopPost [] post
-            :: viewAnnotations [] model (MessageIdPost post.id)
+            :: viewAnnotations [] model characters (MessageIdPost post.id)
             :: List.concatMap
                 (\reply ->
                     [ View.Post.viewReply [] reply
-                    , viewAnnotations [] model (MessageIdReply reply.id)
+                    , viewAnnotations [] model characters (MessageIdReply reply.id)
                     ]
                 )
                 replies
         )
 
 
-viewAnnotations : List (Attribute Msg) -> Model -> MessageId -> Html Msg
-viewAnnotations attrs model messageId =
+viewAnnotations : List (Attribute Msg) -> Model -> SeqDict (Id CharacterId) (SeqSet String) -> MessageId -> Html Msg
+viewAnnotations attrs model characters messageId =
     let
         annotations : List Annotation
         annotations =
@@ -187,13 +195,13 @@ viewAnnotations attrs model messageId =
         addButton : Html (List Annotation)
         addButton =
             Html.button
-                [-- Html.Events.onClick (annotations ++ [ emptyAnnotation ])
+                [ Html.Events.onClick (annotations ++ [ Enter (Id.unsafe 0) ])
                 ]
                 [ Html.text "➕" ]
     in
     (List.indexedMap
         (\i annotation ->
-            viewAnnotation annotation
+            viewAnnotation characters annotation
                 |> Html.map (\newAnnotation -> List.Extra.setAt i newAnnotation annotations)
         )
         annotations
@@ -203,44 +211,76 @@ viewAnnotations attrs model messageId =
         |> Html.div attrs
 
 
-viewAnnotation : Annotation -> Html Annotation
-viewAnnotation annotation =
+viewAnnotation : SeqDict (Id CharacterId) (SeqSet String) -> Annotation -> Html Annotation
+viewAnnotation characters annotation =
     let
-        idInt : Int
-        idInt =
+        none :
+            { idString : String
+            , characterIdMaybe : Maybe (Id CharacterId)
+            , postIdMaybe : Maybe (Id PostId)
+            , replyIdMaybe : Maybe (Id ReplyId)
+            }
+        none =
+            { idString = ""
+            , characterIdMaybe = Nothing
+            , postIdMaybe = Nothing
+            , replyIdMaybe = Nothing
+            }
+
+        ids :
+            { idString : String
+            , characterIdMaybe : Maybe (Id CharacterId)
+            , postIdMaybe : Maybe (Id PostId)
+            , replyIdMaybe : Maybe (Id ReplyId)
+            }
+        ids =
             case annotation of
                 Enter id ->
-                    Id.toInt id
+                    { none | idString = Id.toString id, characterIdMaybe = Just id }
 
                 Exit id ->
-                    Id.toInt id
+                    { none | idString = Id.toString id, characterIdMaybe = Just id }
 
                 HappensBefore (MessageIdPost id) ->
-                    Id.toInt id
+                    { none | idString = Id.toString id, postIdMaybe = Just id }
 
                 HappensBefore (MessageIdReply id) ->
-                    Id.toInt id
+                    { none | idString = Id.toString id, replyIdMaybe = Just id }
 
                 HappensAfter (MessageIdPost id) ->
-                    Id.toInt id
+                    { none | idString = Id.toString id, postIdMaybe = Just id }
 
                 HappensAfter (MessageIdReply id) ->
-                    Id.toInt id
+                    { none | idString = Id.toString id, replyIdMaybe = Just id }
+
+        characterId : Id CharacterId
+        characterId =
+            ids.characterIdMaybe
+                |> Maybe.Extra.orElse (List.head (SeqDict.keys characters))
+                |> Maybe.withDefault (Id.unsafe 0)
+
+        postId : Id PostId
+        postId =
+            ids.postIdMaybe |> Maybe.withDefault (Id.unsafe 0)
+
+        replyId : Id ReplyId
+        replyId =
+            ids.replyIdMaybe |> Maybe.withDefault (Id.unsafe 0)
 
         selectOptions : List ( String, Annotation )
         selectOptions =
-            [ ( "Enter id", Enter (Id.unsafe idInt) )
-            , ( "Exit id", Exit (Id.unsafe idInt) )
-            , ( "Happens before post", HappensBefore (MessageIdPost (Id.unsafe idInt)) )
-            , ( "Happens before reply", HappensBefore (MessageIdReply (Id.unsafe idInt)) )
-            , ( "Happens after post", HappensAfter (MessageIdPost (Id.unsafe idInt)) )
-            , ( "Happens after reply", HappensAfter (MessageIdReply (Id.unsafe idInt)) )
+            [ ( "Enter id", Enter characterId )
+            , ( "Exit id", Exit characterId )
+            , ( "Happens before post", HappensBefore (MessageIdPost postId) )
+            , ( "Happens before reply", HappensBefore (MessageIdReply replyId) )
+            , ( "Happens after post", HappensAfter (MessageIdPost postId) )
+            , ( "Happens after reply", HappensAfter (MessageIdReply replyId) )
             ]
 
         changeId : String -> Annotation
         changeId newIdString =
             let
-                newId : Int
+                newId : Maybe Int
                 newId =
                     -- Allow posting a full link, just grab the digits at the end
                     newIdString
@@ -250,62 +290,90 @@ viewAnnotation annotation =
                         |> List.reverse
                         |> String.fromList
                         |> String.toInt
-                        |> Maybe.withDefault idInt
             in
             case annotation of
-                Enter _ ->
-                    Enter (Id.unsafe newId)
+                Enter oldId ->
+                    Enter (newId |> Maybe.map Id.unsafe |> Maybe.withDefault oldId)
 
-                Exit _ ->
-                    Exit (Id.unsafe newId)
+                Exit oldId ->
+                    Exit (newId |> Maybe.map Id.unsafe |> Maybe.withDefault oldId)
 
-                HappensBefore (MessageIdPost _) ->
-                    HappensBefore (MessageIdPost (Id.unsafe newId))
+                HappensBefore (MessageIdPost oldId) ->
+                    HappensBefore (MessageIdPost (newId |> Maybe.map Id.unsafe |> Maybe.withDefault oldId))
 
-                HappensBefore (MessageIdReply _) ->
-                    HappensBefore (MessageIdReply (Id.unsafe newId))
+                HappensBefore (MessageIdReply oldId) ->
+                    HappensBefore (MessageIdReply (newId |> Maybe.map Id.unsafe |> Maybe.withDefault oldId))
 
-                HappensAfter (MessageIdPost _) ->
-                    HappensAfter (MessageIdPost (Id.unsafe newId))
+                HappensAfter (MessageIdPost oldId) ->
+                    HappensAfter (MessageIdPost (newId |> Maybe.map Id.unsafe |> Maybe.withDefault oldId))
 
-                HappensAfter (MessageIdReply _) ->
-                    HappensAfter (MessageIdReply (Id.unsafe newId))
+                HappensAfter (MessageIdReply oldId) ->
+                    HappensAfter (MessageIdReply (newId |> Maybe.map Id.unsafe |> Maybe.withDefault oldId))
+
+        characterSelect : (Id CharacterId -> Annotation) -> Html Annotation
+        characterSelect ctor =
+            let
+                options =
+                    characters
+                        |> SeqDict.toList
+                        |> List.map
+                            (\( id, names ) ->
+                                ( String.join ", " (SeqSet.toList names)
+                                , ctor id
+                                )
+                            )
+            in
+            select (options ++ [ ( "Other", ctor characterId ) ]) annotation
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
         , Html.Attributes.style "flex-direction" "column"
         , Html.Attributes.style "gap" "4px"
         ]
-        [ selectOptions
-            |> List.map
-                (\( label, value ) ->
-                    Html.option
-                        [ Html.Attributes.selected (value == annotation)
-                        , Html.Attributes.value label
-                        ]
-                        [ Html.text label ]
-                )
-            |> Html.select
-                [ Html.Events.onInput
-                    (\key ->
-                        selectOptions
-                            |> List.Extra.findMap
-                                (\( k, v ) ->
-                                    if k == key then
-                                        Just v
+        [ select selectOptions annotation
+        , case annotation of
+            Enter _ ->
+                characterSelect Enter
 
-                                    else
-                                        Nothing
-                                )
-                            |> Maybe.withDefault annotation
-                    )
-                ]
+            Exit _ ->
+                characterSelect Exit
+
+            _ ->
+                Html.text ""
         , Html.input
             [ Html.Events.onInput changeId
-            , Html.Attributes.value (String.fromInt idInt)
+            , Html.Attributes.value ids.idString
             ]
             []
         ]
+
+
+select : List ( String, value ) -> value -> Html value
+select selectOptions currentValue =
+    selectOptions
+        |> List.map
+            (\( label, optionValue ) ->
+                Html.option
+                    [ Html.Attributes.selected (optionValue == currentValue)
+                    , Html.Attributes.value label
+                    ]
+                    [ Html.text label ]
+            )
+        |> Html.select
+            [ Html.Events.onInput
+                (\key ->
+                    selectOptions
+                        |> List.Extra.findMap
+                            (\( k, v ) ->
+                                if k == key then
+                                    Just v
+
+                                else
+                                    Nothing
+                            )
+                        |> Maybe.withDefault currentValue
+                )
+            ]
 
 
 calculatePostAnnotations : ( PostDetails, List Reply ) -> Monad (List ( MessageId, Annotation ))

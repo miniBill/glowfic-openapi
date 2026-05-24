@@ -5,6 +5,7 @@ import BackendTask exposing (BackendTask)
 import Color.Oklch as Oklch exposing (Oklch)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
+import Glowfic.Utils
 import GlowficApi.Extra
 import GlowficApi.Types exposing (PostDetails, Reply)
 import GlowficRoute
@@ -126,7 +127,7 @@ monad params =
         frequency : SeqDict (Id CharacterId) Int
         frequency =
             posts
-                |> List.map (\post -> allCharactersIds post |> SeqDict.map (\_ _ -> 1))
+                |> List.map (\post -> Glowfic.Utils.allCharactersIds post |> SeqDict.map (\_ _ -> 1))
                 |> List.foldl
                     (\e a ->
                         SeqDict.merge
@@ -228,26 +229,6 @@ getCharacter id color =
                           }
                         )
             )
-
-
-allCharactersIds : ( PostDetails, List Reply ) -> SeqDict (Id CharacterId) (SeqSet String)
-allCharactersIds ( post, replies ) =
-    let
-        replyToCharacter : Reply -> Maybe ( Id CharacterId, String )
-        replyToCharacter reply =
-            Maybe.map
-                (\character ->
-                    ( Id.for character
-                    , reply.character_name |> Maybe.withDefault character.name
-                    )
-                )
-                reply.character
-    in
-    (Maybe.map (\character -> ( Id.for character, character.name )) post.character
-        :: List.map replyToCharacter replies
-    )
-        |> Maybe.Extra.values
-        |> SeqDict.Extra.groupByWith Tuple.first Tuple.second
 
 
 view : App Data ActionData RouteParams -> Model -> View msg
@@ -481,7 +462,7 @@ viewPostCharacters appData post replies =
     let
         charactersIds : SeqDict (Id CharacterId) (SeqSet String)
         charactersIds =
-            allCharactersIds ( post, replies )
+            Glowfic.Utils.allCharactersIds ( post, replies )
     in
     charactersIds
         |> SeqDict.keys
