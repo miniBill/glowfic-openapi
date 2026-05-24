@@ -21,7 +21,7 @@ viewPost post =
                 post.authors
                     |> List.head
                     |> Maybe.withDefault
-                        { id = -1
+                        { id = Id.unsafe -1
                         , username = ""
                         }
             }
@@ -77,7 +77,7 @@ viewIcon : Icon -> Html msg
 viewIcon { id, url } =
     Html.a
         [ Html.Attributes.class "icon"
-        , Html.Attributes.href ("https://glowfic.com/icons/" ++ String.fromInt id)
+        , Html.Attributes.href ("https://glowfic.com/icons/" ++ Id.toString id)
         ]
         [ Html.img [ Html.Attributes.src (Url.toString url) ] []
         ]
@@ -90,7 +90,7 @@ viewNames reply =
         ]
         [ viewCharacterNames reply
         , Html.a
-            [ Html.Attributes.href ("https://glowfic.com/users/" ++ String.fromInt reply.user.id)
+            [ Html.Attributes.href ("https://glowfic.com/users/" ++ Id.toString reply.user.id)
             , Html.Attributes.class "username"
             ]
             [ Html.p [] [ Html.text reply.user.username ]
@@ -108,7 +108,7 @@ viewCharacterNames reply =
             Html.div
                 [ Html.Attributes.class "character-name" ]
                 [ Html.a
-                    [ Html.Attributes.href ("https://glowfic.com/characters/" ++ String.fromInt character.id)
+                    [ Html.Attributes.href ("https://glowfic.com/characters/" ++ Id.toString character.id)
                     ]
                     [ Html.p [] [ Html.text character.name ] ]
                 , case character.screenname of

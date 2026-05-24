@@ -12,7 +12,7 @@ import Duration exposing (Duration)
 import FatalError exposing (FatalError)
 import GlowficApi.Api
 import GlowficApi.Types exposing (Board, CharacterDetails, PostDetails, PostSummary, Reply)
-import Id exposing (Id)
+import Id exposing (BoardId, CharacterId, Id, PostId, SectionId)
 import List.Extra
 import Pages.Script as Script
 import Quantity
@@ -167,7 +167,11 @@ durationToString duration =
         String.fromInt milliseconds ++ "ms"
 
 
-getCharacter : { got429 : Bool } -> { token : String } -> Id t -> BackendTask FatalError ( CharacterDetails, { got429 : Bool } )
+getCharacter :
+    { got429 : Bool }
+    -> { token : String }
+    -> Id CharacterId
+    -> BackendTask FatalError ( CharacterDetails, { got429 : Bool } )
 getCharacter got429 authorization id =
     getRefreshingIf got429
         (\_ -> False)
@@ -175,20 +179,24 @@ getCharacter got429 authorization id =
         GlowficApi.Api.getCharactersIdRecord
         authorization
         { params =
-            { id = Id.toInt id
+            { id = id
             , post_id = Nothing
             }
         }
 
 
-getPost : { got429 : Bool } -> { token : String } -> Id PostDetails -> BackendTask FatalError ( ( PostDetails, List Reply ), { got429 : Bool } )
+getPost :
+    { got429 : Bool }
+    -> { token : String }
+    -> Id PostId
+    -> BackendTask FatalError ( ( PostDetails, List Reply ), { got429 : Bool } )
 getPost got429 authorization id =
     getRefreshingIf got429
         (\post -> post.status /= GlowficApi.Types.Status__Complete)
         ("getPost " ++ Id.toString id)
         GlowficApi.Api.getPostsIdRecord
         authorization
-        { params = { id = Id.toInt id }
+        { params = { id = id }
         }
         |> BackendTask.andThen
             (\( post, newTryRefresh ) ->
@@ -206,7 +214,7 @@ getPost got429 authorization id =
                                 GlowficApi.Api.getPostsIdRepliesRecord
                                 authorization
                                 { params =
-                                    { id = Id.toInt id
+                                    { id = id
                                     , page = Just page
                                     , per_page = Just 100
                                     }
@@ -262,13 +270,13 @@ combineWithCircuitBreaker got429 list =
 getBoard :
     { got429 : Bool }
     -> { token : String }
-    -> Id Board
+    -> Id BoardId
     ->
         BackendTask
             FatalError
-            ( { id : Int
+            ( { id : Id BoardId
               , name : String
-              , board_sections : List { id : Int, name : String, order : Int }
+              , board_sections : List { id : Id SectionId, name : String, order : Int }
               }
             , { got429 : Bool }
             )
@@ -278,13 +286,13 @@ getBoard got429 authorization id =
         ("getBoard " ++ Id.toString id)
         GlowficApi.Api.getBoardsIdRecord
         authorization
-        { params = { id = Id.toInt id } }
+        { params = { id = id } }
 
 
 getAllBoardsIdPosts :
     { got429 : Bool }
     -> { token : String }
-    -> Id Board
+    -> Id BoardId
     -> BackendTask FatalError ( List PostSummary, { got429 : Bool } )
 getAllBoardsIdPosts got429 authorization continuityId =
     let
@@ -300,7 +308,7 @@ getAllBoardsIdPosts got429 authorization continuityId =
                 GlowficApi.Api.getBoardsIdPostsRecord
                 authorization
                 { params =
-                    { id = Id.toInt continuityId
+                    { id = continuityId
                     , page = Just page
                     }
                 }

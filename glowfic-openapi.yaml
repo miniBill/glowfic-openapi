@@ -150,6 +150,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id BoardId
             responses:
                 200:
                     description: Successful operation
@@ -173,6 +174,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id BoardId
                 - name: page
                   in: query
                   description: Page in results (25 per page)
@@ -264,6 +266,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id BookmarkId
                 - name: Authorization
                   in: header
                   description: >-
@@ -297,6 +300,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id BookmarkId
                 - name: Authorization
                   in: header
                   description: >-
@@ -359,6 +363,7 @@ paths:
                       post
                   schema:
                       type: integer
+                      format: Id PostId
                 - name: user_id
                   in: query
                   description: >-
@@ -366,6 +371,7 @@ paths:
                       user
                   schema:
                       type: integer
+                      format: Id UserId
                 - name: template_id
                   in: query
                   description: >-
@@ -373,6 +379,7 @@ paths:
                       template. Use 0 to find only characters with no template.
                   schema:
                       type: integer
+                      format: Id TemplateId
                 - name: includes
                   in: query
                   description: Specify additional fields to return in JSON
@@ -409,6 +416,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id CharacterId
                 - name: post_id
                   in: query
                   description: >-
@@ -417,6 +425,7 @@ paths:
                       provided post
                   schema:
                       type: integer
+                      format: Id PostId
             responses:
                 "200":
                     description: Successful operation
@@ -445,6 +454,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id CharacterId
             responses:
                 "200":
                     description: Successful operation
@@ -509,11 +519,13 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id GalleryId
                 - name: user_id
                   in: query
                   description: User ID required when accessing galleryless icons while logged out.
                   schema:
                       type: integer
+                      format: Id UserId
             responses:
                 "200":
                     description: Successful operation
@@ -578,7 +590,7 @@ paths:
                                         format: Id PostId
                                 section_id:
                                     type: integer
-                                    format: Id BoardSectionId
+                                    format: Id SectionId
             responses:
                 "200":
                     description: Successful operation
@@ -613,7 +625,7 @@ paths:
                                     type: array
                                     items:
                                         type: integer
-                                        format: Id BoardSectionId
+                                        format: Id SectionId
             responses:
                 "200":
                     description: Successful operation
@@ -670,6 +682,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id PostId
             responses:
                 "200":
                     description: Successful operation
@@ -697,6 +710,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id PostId
                 - name: Authorization
                   in: header
                   description: >-
@@ -751,6 +765,7 @@ paths:
                                         format: Id PostId
                                 section_id:
                                     type: integer
+                                    format: Id SectionId
             responses:
                 "200":
                     description: Successful operation
@@ -779,6 +794,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id PostId
                 - name: page
                   in: query
                   description: Page in results
@@ -819,12 +835,14 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id ReplyId
                 - name: user_id
                   in: query
                   description: User ID
                   required: true
                   schema:
                       type: integer
+                      format: Id UserId
             responses:
                 "200":
                     description: Successful operation
@@ -854,7 +872,7 @@ paths:
                                     type: array
                                     items:
                                         type: integer
-                                        format: Id BoardSectionId
+                                        format: Id SectionId
                 required: true
             responses:
                 "200":
@@ -868,7 +886,7 @@ paths:
                                         type: array
                                         items:
                                             type: integer
-                                            format: Id BoardSectionId
+                                            format: Id SectionId
                 "401":
                     description: You must be logged in
                     content: {}
@@ -916,6 +934,7 @@ paths:
                   description: Filter GalleryGroups to the current user
                   schema:
                       type: integer
+                      format: Id UserId
                 - name: tag_id
                   in: query
                   description: >-
@@ -923,6 +942,7 @@ paths:
                       parent setting of itself
                   schema:
                       type: integer
+                      format: Id TagId
             responses:
                 "200":
                     description: Successful operation
@@ -943,6 +963,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id TagId
             responses:
                 "200":
                     description: Successful operation
@@ -974,6 +995,7 @@ paths:
                   description: ID of the template user (optional)
                   schema:
                       type: integer
+                      format: Id UserId
             responses:
                 "200":
                     description: Successful operation
@@ -1034,6 +1056,7 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id UserId
                 - name: page
                   in: query
                   description: Page in results (25 per page)
@@ -1059,11 +1082,13 @@ paths:
                   required: true
                   schema:
                       type: integer
+                      format: Id UserId
                 - name: post_id
                   in: query
                   description: Post ID
                   schema:
                       type: integer
+                      format: Id PostId
                 - name: page
                   in: query
                   description: Page in results (25 per page)
@@ -1124,7 +1149,7 @@ components:
             properties:
                 id:
                     type: integer
-                    format: Id BoardSectionId
+                    format: Id SectionId
                 name:
                     type: string
                 order:
@@ -1275,6 +1300,7 @@ components:
                     type: array
                     items:
                         $ref: "#/components/schemas/User"
+                    minLength: 1
                 num_replies:
                     type: integer
             required:

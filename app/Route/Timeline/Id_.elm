@@ -15,7 +15,7 @@ import Head.Seo as Seo
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Parser
-import Id exposing (Id)
+import Id exposing (BoardId, CharacterId, IconId, Id, PostId, ReplyId)
 import List.Extra
 import Maybe.Extra
 import OpenApi.Common
@@ -40,10 +40,10 @@ type alias ActionData =
 
 type alias Data =
     { name : String
-    , posts : SeqDict (Id PostDetails) ( PostDetails, List Reply )
+    , posts : SeqDict (Id PostId) ( PostDetails, List Reply )
     , characters :
         SeqDict
-            (Id Character)
+            (Id CharacterId)
             CharacterSummary
     , links : Result ( String, List Parser.DeadEnd ) (List Link)
     }
@@ -52,7 +52,7 @@ type alias Data =
 type alias CharacterSummary =
     { name : String
     , color : Oklch
-    , icon : Maybe { id : Id Icon, url : Url }
+    , icon : Maybe { id : Id IconId, url : Url }
     }
 
 
@@ -64,8 +64,8 @@ type alias Link =
 
 
 type MessageId
-    = MessageIdReply (Id PostDetails) (Id Reply)
-    | MessageIdPost (Id PostDetails)
+    = MessageIdReply (Id PostId) (Id ReplyId)
+    | MessageIdPost (Id PostId)
 
 
 type alias Model =
@@ -123,7 +123,7 @@ data params =
 
             Just i ->
                 let
-                    boardId : Id Board
+                    boardId : Id BoardId
                     boardId =
                         Id.unsafe i
                 in
@@ -133,9 +133,9 @@ data params =
     Do.do GlowficApi.Extra.login <| \( authorization, break1 ) ->
     Do.do (GlowficApi.Extra.getBoard break1 authorization continuityId) <| \( board, break2 ) ->
     Do.do (GlowficApi.Extra.getAllBoardsIdPosts break2 authorization continuityId) <| \( results, break3 ) ->
-    DoExtra.eachCountWithCircuitBreaker break3 results (\brk post -> GlowficApi.Extra.getPost brk authorization (Id.unsafe post.id)) <| \( posts, break4 ) ->
+    DoExtra.eachCountWithCircuitBreaker break3 results (\brk post -> GlowficApi.Extra.getPost brk authorization post.id) <| \( posts, break4 ) ->
     let
-        charactersIds : List (Id Character)
+        charactersIds : List (Id CharacterId)
         charactersIds =
             List.concatMap (\p -> allCharactersIds p |> SeqDict.keys) posts
                 |> SeqSet.fromList
@@ -144,7 +144,7 @@ data params =
     Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("🧑 Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
     DoExtra.eachCountWithCircuitBreaker break4 (assignColors charactersIds) (\brk ( id, color ) -> getCharacter brk authorization id color) <| \( characters, _ ) ->
     let
-        replyToPost : SeqDict (Id Reply) (Id PostDetails)
+        replyToPost : SeqDict (Id ReplyId) (Id PostId)
         replyToPost =
             posts
                 |> List.concatMap
@@ -189,7 +189,7 @@ assignColors list =
     List.indexedMap (\i e -> ( e, Oklch.oklch 0.7 0.2 (toFloat i / len) )) list
 
 
-calculatePostsLinks : SeqDict (Id Reply) (Id PostDetails) -> List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List Link)
+calculatePostsLinks : SeqDict (Id ReplyId) (Id PostId) -> List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List Link)
 calculatePostsLinks replyToPost posts =
     if 3 > 0 then
         Ok []
@@ -205,24 +205,24 @@ calculatePostsLinks replyToPost posts =
                 )
 
 
-calculatePostLinks : SeqDict (Id Reply) (Id PostDetails) -> ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculatePostLinks : SeqDict (Id ReplyId) (Id PostId) -> ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (Rope Link)
 calculatePostLinks replyToPost ( post, replies ) =
     Result.map2 Rope.appendTo
         (calculatePostDetailsLinks replyToPost post)
         (Result.map Rope.fromRopeList (Result.Extra.combineMap (calculateReplyLinks replyToPost post) replies))
 
 
-calculatePostDetailsLinks : SeqDict (Id Reply) (Id PostDetails) -> PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculatePostDetailsLinks : SeqDict (Id ReplyId) (Id PostId) -> PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope Link)
 calculatePostDetailsLinks replyToPost ({ content } as p) =
     calculateContentLinks replyToPost (MessageIdPost (Id.for p)) content
 
 
-calculateReplyLinks : SeqDict (Id Reply) (Id PostDetails) -> PostDetails -> Reply -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculateReplyLinks : SeqDict (Id ReplyId) (Id PostId) -> PostDetails -> Reply -> Result ( String, List Parser.DeadEnd ) (Rope Link)
 calculateReplyLinks replyToPost post reply =
     calculateContentLinks replyToPost (MessageIdReply (Id.for post) (Id.for reply)) reply.content
 
 
-calculateContentLinks : SeqDict (Id Reply) (Id PostDetails) -> MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculateContentLinks : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope Link)
 calculateContentLinks replyToPost from content =
     case Html.Parser.run Html.Parser.noCharRefs content of
         Err e ->
@@ -234,7 +234,7 @@ calculateContentLinks replyToPost from content =
                 |> Result.map Rope.fromRopeList
 
 
-calculateNodeLinks : SeqDict (Id Reply) (Id PostDetails) -> MessageId -> Html.Parser.Node -> Result ( String, List Parser.DeadEnd ) (Rope Link)
+calculateNodeLinks : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> Html.Parser.Node -> Result ( String, List Parser.DeadEnd ) (Rope Link)
 calculateNodeLinks replyToPost from node =
     case node of
         Html.Parser.Element "a" attrs children ->
@@ -285,7 +285,7 @@ nodeToString node =
             ""
 
 
-targetParser : SeqDict (Id Reply) (Id PostDetails) -> MessageId -> Parser (Maybe MessageId)
+targetParser : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> Parser (Maybe MessageId)
 targetParser replyToPost from =
     Parser.oneOf
         [ Parser.succeed Id.unsafe
@@ -331,12 +331,12 @@ targetParser replyToPost from =
 getCharacter :
     { got429 : Bool }
     -> { token : String }
-    -> Id Character
+    -> Id CharacterId
     -> Oklch
     ->
         BackendTask
             FatalError
-            ( Maybe ( Id Character, CharacterSummary )
+            ( Maybe ( Id CharacterId, CharacterSummary )
             , { got429 : Bool }
             )
 getCharacter got429 authorization id color =
@@ -357,7 +357,7 @@ getCharacter got429 authorization id color =
                                         Nothing
 
                                     OpenApi.Common.Present icon ->
-                                        Just { id = Id.unsafe icon.id, url = icon.url }
+                                        Just { id = icon.id, url = icon.url }
                           }
                         )
                 , newGot429
@@ -365,10 +365,10 @@ getCharacter got429 authorization id color =
             )
 
 
-allCharactersIds : ( PostDetails, List Reply ) -> SeqDict (Id Character) (SeqSet String)
+allCharactersIds : ( PostDetails, List Reply ) -> SeqDict (Id CharacterId) (SeqSet String)
 allCharactersIds ( post, replies ) =
     let
-        replyToCharacter : Reply -> Maybe ( Id Character, String )
+        replyToCharacter : Reply -> Maybe ( Id CharacterId, String )
         replyToCharacter reply =
             Maybe.map
                 (\character ->
@@ -390,7 +390,7 @@ view app _ =
     { title = app.data.name
     , body =
         let
-            frequency : SeqDict (Id Character) Int
+            frequency : SeqDict (Id CharacterId) Int
             frequency =
                 app.data.posts
                     |> SeqDict.values
@@ -455,7 +455,7 @@ view app _ =
     }
 
 
-viewCharacters : SeqDict (Id Character) CharacterSummary -> Html msg
+viewCharacters : SeqDict (Id CharacterId) CharacterSummary -> Html msg
 viewCharacters characters =
     characters
         |> SeqDict.toList
@@ -468,7 +468,7 @@ viewCharacters characters =
             ]
 
 
-viewCharacter : ( Id Character, CharacterSummary ) -> List (Html msg)
+viewCharacter : ( Id CharacterId, CharacterSummary ) -> List (Html msg)
 viewCharacter ( characterId, { name, icon, color } ) =
     [ case icon of
         Just { url } ->
@@ -532,7 +532,7 @@ viewPostTitles appData =
                     [ Html.Attributes.href (GlowficRoute.post (Id.for post))
                     , Html.Attributes.style "display" "block"
                     , Html.Attributes.style "grid-row-start" "post-name-start"
-                    , Html.Attributes.style "grid-column-start" ("p" ++ String.fromInt post.id ++ "-start")
+                    , Html.Attributes.style "grid-column-start" ("p" ++ Id.toString post.id ++ "-start")
                     , Html.Attributes.style "writing-mode" "vertical-rl"
                     , Html.Attributes.style "text-orientation" "mixed"
                     ]
@@ -549,14 +549,14 @@ viewPostTitles appData =
 --             errorToHtml content deadEnds
 --         Ok links ->
 --             let
---                 toPostId : MessageId -> Id PostDetails
+--                 toPostId : MessageId -> Id PostId
 --                 toPostId messageId =
 --                     case messageId of
 --                         MessageIdPost pid ->
 --                             pid
 --                         MessageIdReply pid _ ->
 --                             pid
---                 posts : SeqSet (Id PostDetails)
+--                 posts : SeqSet (Id PostId)
 --                 posts =
 --                     links
 --                         |> List.concatMap
@@ -650,7 +650,7 @@ messageIdToString id =
 viewPostCharacters : Data -> PostDetails -> List Reply -> List (Html msg)
 viewPostCharacters appData post replies =
     let
-        charactersIds : SeqDict (Id Character) (SeqSet String)
+        charactersIds : SeqDict (Id CharacterId) (SeqSet String)
         charactersIds =
             allCharactersIds ( post, replies )
     in
@@ -684,7 +684,7 @@ viewPostCharacters appData post replies =
                       Html.Attributes.style "border" "1px solid white"
                     , Html.Attributes.style "padding" "4px"
                     , Html.Attributes.style "grid-row-start" ("c" ++ Id.toString characterId ++ "-start")
-                    , Html.Attributes.style "grid-column-start" ("p" ++ String.fromInt post.id ++ "-start")
+                    , Html.Attributes.style "grid-column-start" ("p" ++ Id.toString post.id ++ "-start")
                     ]
                     [ Html.text "X" ]
             )

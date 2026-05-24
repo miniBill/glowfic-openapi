@@ -10,7 +10,7 @@ import Head.Seo as Seo
 import Html exposing (Html)
 import Html.Attributes
 import Html.Parser
-import Id exposing (Id)
+import Id exposing (Id, PostId)
 import List.Extra
 import OpenApi.Common
 import Pages.Url
@@ -26,7 +26,7 @@ type alias ActionData =
 
 
 type alias Data =
-    SeqDict (Id PostDetails) ( PostDetails, List Reply )
+    SeqDict (Id PostId) ( PostDetails, List Reply )
 
 
 type alias Model =
@@ -68,7 +68,7 @@ head _ =
         |> Seo.website
 
 
-rootPost : Id PostDetails
+rootPost : Id PostId
 rootPost =
     Id.unsafe 47527
 
@@ -79,7 +79,7 @@ data =
     go got429 token [ rootPost ] SeqDict.empty
 
 
-go : { got429 : Bool } -> { token : String } -> List (Id PostDetails) -> Data -> BackendTask FatalError Data
+go : { got429 : Bool } -> { token : String } -> List (Id PostId) -> Data -> BackendTask FatalError Data
 go got429 token ids acc =
     case ids of
         [] ->
@@ -118,7 +118,7 @@ view app _ =
     }
 
 
-viewThread : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> Id PostDetails -> Html msg
+viewThread : SeqDict (Id PostId) ( PostDetails, List Reply ) -> Id PostId -> Html msg
 viewThread posts id =
     case SeqDict.get id posts of
         Nothing ->
@@ -147,7 +147,7 @@ viewThread posts id =
                 )
 
 
-threadWidth : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> List Reply -> Html.Attribute msg
+threadWidth : SeqDict (Id PostId) ( PostDetails, List Reply ) -> List Reply -> Html.Attribute msg
 threadWidth posts replies =
     let
         l : Int
@@ -168,7 +168,7 @@ threadWidth posts replies =
         )
 
 
-parallels : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> List Reply -> Int
+parallels : SeqDict (Id PostId) ( PostDetails, List Reply ) -> List Reply -> Int
 parallels posts queue =
     case queue of
         [] ->
@@ -188,7 +188,7 @@ parallels posts queue =
                             parallels posts replies + parallels posts t
 
 
-viewReplies : SeqDict (Id PostDetails) ( PostDetails, List Reply ) -> List Reply -> List (Html msg)
+viewReplies : SeqDict (Id PostId) ( PostDetails, List Reply ) -> List Reply -> List (Html msg)
 viewReplies posts replies =
     case replies of
         [] ->
@@ -210,7 +210,7 @@ viewReplies posts replies =
                     View.Post.viewReply h :: viewReplies posts t
 
 
-findLink : String -> Maybe (Id PostDetails)
+findLink : String -> Maybe (Id PostId)
 findLink content =
     case Html.Parser.run Html.Parser.allCharRefs content of
         Ok nodes ->
@@ -220,7 +220,7 @@ findLink content =
             Nothing
 
 
-findPostLink : Html.Parser.Node -> Maybe (Id PostDetails)
+findPostLink : Html.Parser.Node -> Maybe (Id PostId)
 findPostLink node =
     case node of
         Html.Parser.Element name attrs children ->

@@ -1,8 +1,66 @@
-module Id exposing (Id, for, toInt, toString, unsafe)
+module Id exposing
+    ( Id, for, toInt, toString, unsafe
+    , AliasId, BoardId, BookmarkId, CharacterId, GalleryId, IconId, PostId, ReplyId, SectionId, TagId, TemplateId, UserId
+    )
+
+{-|
+
+@docs Id, for, toInt, toString, unsafe
+@docs AliasId, BoardId, BookmarkId, CharacterId, GalleryId, IconId, PostId, ReplyId, SectionId, TagId, TemplateId, UserId
+
+-}
 
 
 type Id t
     = Id Int
+
+
+type AliasId
+    = AliasId Never
+
+
+type BoardId
+    = BoardId Never
+
+
+type BookmarkId
+    = BookmarkId Never
+
+
+type CharacterId
+    = CharacterId Never
+
+
+type GalleryId
+    = GalleryId Never
+
+
+type IconId
+    = IconId Never
+
+
+type PostId
+    = PostId Never
+
+
+type ReplyId
+    = ReplyId Never
+
+
+type SectionId
+    = SectionId Never
+
+
+type TagId
+    = TagId Never
+
+
+type TemplateId
+    = TemplateId Never
+
+
+type UserId
+    = UserId Never
 
 
 unsafe : Int -> Id t
@@ -15,9 +73,9 @@ toInt (Id i) =
     i
 
 
-for : { a | id : Int } -> Id { a | id : Int }
+for : { a | id : Id t } -> Id t
 for t =
-    Id t.id
+    t.id
 
 
 toString : Id t -> String

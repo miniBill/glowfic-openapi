@@ -3,8 +3,7 @@
     "scripts": {
         "start": "watchexec -c -w glowfic-openapi.yaml --on-busy-update restart 'bun run gen; bun elm-pages dev --debug --keep-cache'",
         "build": "bun run gen && elm-pages build",
-        "download": "bunx elm-pages run ./script/DownloadLinks.elm",
-        "gen": "bunx elm-pages run ~/src/wolfadex/elm-open-api-cli/cli/src/Cli.elm --effect-types dillonkearns/elm-pages.task,dillonkearns/elm-pages.taskrecord ./glowfic-openapi.yaml"
+        "gen": "elm-pages run ./script/src/GenerateOpenApi.elm"
     },
     "devDependencies": {
         "elm": "^0.19.1-6",
