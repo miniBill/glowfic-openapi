@@ -3,7 +3,6 @@ module GenerateOpenApi exposing (run)
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
 import Cli
-import CliMonad exposing (CliMonad)
 import Common
 import Elm
 import Elm.Annotation

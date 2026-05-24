@@ -4,13 +4,11 @@
         ".elm-pages",
         "app",
         "src",
-        "generated",
-        "script"
+        "generated"
     ],
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
-            "avh4/elm-color": "1.0.0",
             "danneu/html-parser": "2.0.3",
             "dillonkearns/elm-form": "3.1.0",
             "dillonkearns/elm-pages": "12.3.0",
@@ -36,6 +34,7 @@
             "BrianHicks/elm-string-graphemes": "1.0.4",
             "Chadtech/elm-bool-extra": "2.4.2",
             "MaybeJustJames/yaml": "2.1.7",
+            "avh4/elm-color": "1.0.0",
             "danyx23/elm-mimetype": "4.0.1",
             "dillonkearns/elm-bcp47-language-tag": "2.0.0",
             "dillonkearns/elm-cli-options-parser": "5.0.1",

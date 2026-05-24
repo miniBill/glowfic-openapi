@@ -1,29 +1,25 @@
-module Route.Timeline.Id_ exposing (ActionData, Data, Model, Msg, RouteParams, route)
+module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, Msg, RouteParams, route)
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
-import BackendTask.Do.Extra as DoExtra
 import Color.Oklch as Oklch exposing (Oklch)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import GlowficApi.Extra
-import GlowficApi.Types exposing (Board, Character, Icon, PostDetails, Reply)
+import GlowficApi.Types exposing (PostDetails, Reply)
 import GlowficRoute
 import Head
 import Head.Seo as Seo
-import Html exposing (Attribute, Html)
+import Html exposing (Html)
 import Html.Attributes
 import Html.Parser
-import Id exposing (BoardId, CharacterId, IconId, Id, PostId, ReplyId)
+import Id exposing (BoardId, CharacterId, IconId, Id, PostId)
 import List.Extra
 import Maybe.Extra
 import Monad exposing (Monad)
 import Monad.Do as Do
 import OpenApi.Common
 import Pages.Url
-import Parser exposing ((|.), (|=), Parser)
-import Result.Extra
-import Rope exposing (Rope)
 import Route
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
@@ -55,11 +51,6 @@ type alias CharacterSummary =
     , color : Oklch
     , icon : Maybe { id : Id IconId, url : Url }
     }
-
-
-type MessageId
-    = MessageIdReply (Id PostId) (Id ReplyId)
-    | MessageIdPost (Id PostId)
 
 
 type alias Model =
@@ -162,19 +153,6 @@ monad params =
     Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("🧑 Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
     Do.eachCount (assignColors charactersIds) (\( id, color ) -> getCharacter id color) <| \characters ->
     let
-        replyToPost : SeqDict (Id ReplyId) (Id PostId)
-        replyToPost =
-            posts
-                |> List.concatMap
-                    (\( p, rs ) ->
-                        let
-                            pid =
-                                Id.for p
-                        in
-                        List.map (\r -> ( Id.for r, pid )) rs
-                    )
-                |> SeqDict.fromList
-
         result : Data
         result =
             { characters =
@@ -399,7 +377,7 @@ viewPostTitles appData =
                     , Html.Attributes.style "writing-mode" "vertical-rl"
                     , Html.Attributes.style "text-orientation" "mixed"
                     ]
-                    [ Html.text (String.Extra.ellipsis (String.length "Eighty-Eight Million Eight Hundred and Eighty-Eight Tho") post.subject)
+                    [ Html.text (String.Extra.ellipsis 55 post.subject)
                     ]
                     (Route.Timeline__Post__Id_ { id = Id.toString post.id })
             )
@@ -506,12 +484,12 @@ viewPostCharacters appData post replies =
             allCharactersIds ( post, replies )
     in
     charactersIds
-        |> SeqDict.toList
+        |> SeqDict.keys
         |> List.Extra.stableSortWith
             (\l r ->
                 case
-                    ( SeqDict.get (Tuple.first l) appData.characters |> Maybe.andThen .icon
-                    , SeqDict.get (Tuple.first r) appData.characters |> Maybe.andThen .icon
+                    ( SeqDict.get l appData.characters |> Maybe.andThen .icon
+                    , SeqDict.get r appData.characters |> Maybe.andThen .icon
                     )
                 of
                     ( Nothing, Just _ ) ->
@@ -527,7 +505,7 @@ viewPostCharacters appData post replies =
                         EQ
             )
         |> List.map
-            (\( characterId, characterNames ) ->
+            (\characterId ->
                 Html.div
                     [ -- Html.Attributes.style "height" "60px"
                       -- , Html.Attributes.style "width" "10px"

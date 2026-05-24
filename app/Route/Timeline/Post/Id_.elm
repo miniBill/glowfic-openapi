@@ -2,17 +2,15 @@ module Route.Timeline.Post.Id_ exposing (ActionData, Data, Model, Msg, RoutePara
 
 import Annotation exposing (Annotation, MessageId(..))
 import BackendTask exposing (BackendTask)
-import Color.Oklch exposing (Oklch)
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import GlowficApi.Extra
-import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply)
+import GlowficApi.Types exposing (PostDetails, Reply)
 import Head
 import Head.Seo as Seo
 import Html.Parser
-import Http
-import Id exposing (CharacterId, Id, PostId, ReplyId)
+import Id exposing (Id, PostId, ReplyId)
 import List.Extra
 import Monad exposing (Monad)
 import Monad.Do as Do
@@ -21,13 +19,11 @@ import PagesMsg exposing (PagesMsg)
 import Parser exposing ((|.), (|=), Parser)
 import Result.Extra
 import Rope exposing (Rope)
-import RouteBuilder exposing (App, StatefulRoute, StatelessRoute)
+import RouteBuilder exposing (App, StatefulRoute)
 import SeqDict exposing (SeqDict)
-import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
 import Shared
-import Url exposing (Url)
-import UrlPath
+import UrlPath exposing (UrlPath)
 import View exposing (View)
 import View.Post
 
@@ -72,13 +68,13 @@ init _ _ =
     ( { annotations = SeqDict.empty }, Effect.none )
 
 
-subscriptions : RouteParams -> UrlPath.UrlPath -> Shared.Model -> Model -> Sub Msg
-subscriptions arg1 arg2 arg3 arg4 =
+subscriptions : RouteParams -> UrlPath -> Shared.Model -> Model -> Sub Msg
+subscriptions _ _ _ _ =
     Sub.none
 
 
 update : App Data ActionData RouteParams -> Shared.Model -> Msg -> Model -> ( Model, Effect Msg )
-update app shared msg model =
+update app _ msg model =
     case msg of
         () ->
             ( model, Effect.none )
@@ -128,27 +124,42 @@ monad params =
     Monad.succeed (Response.render post)
 
 
-view : RouteBuilder.App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg ())
+view : App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg ())
 view app _ model =
     { title = (Tuple.first app.data).subject
     , body = [ View.Post.viewThread app.data ]
     }
 
 
-calculatePostsLinks : SeqDict (Id ReplyId) (Id PostId) -> List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List MessageId)
-calculatePostsLinks replyToPost posts =
-    if 3 > 0 then
-        Ok []
+calculatePostsLinks : List ( { a | id : Id PostId }, List { b | id : Id ReplyId } ) -> Result ( String, List Parser.DeadEnd ) (List MessageId)
+calculatePostsLinks posts =
+    let
+        replyToPost : SeqDict (Id ReplyId) (Id PostId)
+        replyToPost =
+            posts
+                |> List.concatMap
+                    (\( p, rs ) ->
+                        let
+                            pid =
+                                Id.for p
+                        in
+                        List.map (\r -> ( Id.for r, pid )) rs
+                    )
+                |> SeqDict.fromList
+    in
+    calculatePostsLinksHelper replyToPost []
 
-    else
-        posts
-            |> Result.Extra.combineMap (calculatePostLinks replyToPost)
-            |> Result.map
-                (\rs ->
-                    rs
-                        |> Rope.fromRopeList
-                        |> Rope.toList
-                )
+
+calculatePostsLinksHelper : SeqDict (Id ReplyId) (Id PostId) -> List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List MessageId)
+calculatePostsLinksHelper replyToPost posts =
+    posts
+        |> Result.Extra.combineMap (calculatePostLinks replyToPost)
+        |> Result.map
+            (\rs ->
+                rs
+                    |> Rope.fromRopeList
+                    |> Rope.toList
+            )
 
 
 calculatePostLinks : SeqDict (Id ReplyId) (Id PostId) -> ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (Rope MessageId)
