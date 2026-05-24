@@ -1,4 +1,4 @@
-module Route.Timeline.Id_ exposing (ActionData, Data, Link, MessageId, Model, Msg, RouteParams, route)
+module Route.Timeline.Id_ exposing (ActionData, Data, Model, Msg, RouteParams, route)
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
@@ -47,7 +47,6 @@ type alias Data =
         SeqDict
             (Id CharacterId)
             CharacterSummary
-    , links : Result ( String, List Parser.DeadEnd ) (List Link)
     }
 
 
@@ -55,13 +54,6 @@ type alias CharacterSummary =
     { name : String
     , color : Oklch
     , icon : Maybe { id : Id IconId, url : Url }
-    }
-
-
-type alias Link =
-    { from : MessageId
-    , to : MessageId
-    , label : String
     }
 
 
@@ -197,7 +189,6 @@ monad params =
                         )
                     |> SeqDict.fromList
             , name = board.name
-            , links = calculatePostsLinks replyToPost posts
             }
     in
     result
@@ -213,84 +204,6 @@ assignColors list =
             toFloat (List.length list)
     in
     List.indexedMap (\i e -> ( e, Oklch.oklch 0.7 0.2 (toFloat i / len) )) list
-
-
-calculatePostsLinks : SeqDict (Id ReplyId) (Id PostId) -> List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List Link)
-calculatePostsLinks replyToPost posts =
-    if 3 > 0 then
-        Ok []
-
-    else
-        posts
-            |> Result.Extra.combineMap (calculatePostLinks replyToPost)
-            |> Result.map
-                (\rs ->
-                    rs
-                        |> Rope.fromRopeList
-                        |> Rope.toList
-                )
-
-
-calculatePostLinks : SeqDict (Id ReplyId) (Id PostId) -> ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (Rope Link)
-calculatePostLinks replyToPost ( post, replies ) =
-    Result.map2 Rope.appendTo
-        (calculatePostDetailsLinks replyToPost post)
-        (Result.map Rope.fromRopeList (Result.Extra.combineMap (calculateReplyLinks replyToPost post) replies))
-
-
-calculatePostDetailsLinks : SeqDict (Id ReplyId) (Id PostId) -> PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope Link)
-calculatePostDetailsLinks replyToPost ({ content } as p) =
-    calculateContentLinks replyToPost (MessageIdPost (Id.for p)) content
-
-
-calculateReplyLinks : SeqDict (Id ReplyId) (Id PostId) -> PostDetails -> Reply -> Result ( String, List Parser.DeadEnd ) (Rope Link)
-calculateReplyLinks replyToPost post reply =
-    calculateContentLinks replyToPost (MessageIdReply (Id.for post) (Id.for reply)) reply.content
-
-
-calculateContentLinks : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope Link)
-calculateContentLinks replyToPost from content =
-    case Html.Parser.run Html.Parser.noCharRefs content of
-        Err e ->
-            Err ( content, e )
-
-        Ok parsed ->
-            parsed
-                |> Result.Extra.combineMap (calculateNodeLinks replyToPost from)
-                |> Result.map Rope.fromRopeList
-
-
-calculateNodeLinks : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> Html.Parser.Node -> Result ( String, List Parser.DeadEnd ) (Rope Link)
-calculateNodeLinks replyToPost from node =
-    case node of
-        Html.Parser.Element "a" attrs children ->
-            case List.Extra.find (\( attrName, _ ) -> attrName == "href") attrs of
-                Just ( _, target ) ->
-                    case Parser.run (targetParser replyToPost from) target of
-                        Err e ->
-                            Err ( target, e )
-
-                        Ok Nothing ->
-                            Ok Rope.empty
-
-                        Ok (Just to) ->
-                            Ok (Rope.singleton { from = from, to = to, label = childrenToString children })
-
-                Nothing ->
-                    children
-                        |> Result.Extra.combineMap (calculateNodeLinks replyToPost from)
-                        |> Result.map Rope.fromRopeList
-
-        Html.Parser.Element _ _ children ->
-            children
-                |> Result.Extra.combineMap (calculateNodeLinks replyToPost from)
-                |> Result.map Rope.fromRopeList
-
-        Html.Parser.Text _ ->
-            Ok Rope.empty
-
-        Html.Parser.Comment _ ->
-            Ok Rope.empty
 
 
 childrenToString : List Html.Parser.Node -> String
@@ -309,49 +222,6 @@ nodeToString node =
 
         Html.Parser.Comment _ ->
             ""
-
-
-targetParser : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> Parser (Maybe MessageId)
-targetParser replyToPost from =
-    Parser.oneOf
-        [ Parser.succeed Id.unsafe
-            |. Parser.oneOf
-                [ Parser.token "/replies/"
-                , Parser.token "https://glowfic.com/replies/"
-                ]
-            |= Parser.int
-            |. Parser.token "#reply-"
-            |. Parser.int
-            |> Parser.andThen
-                (\id ->
-                    case SeqDict.get id replyToPost of
-                        Just pid ->
-                            Parser.succeed (Just (MessageIdReply pid id))
-
-                        Nothing ->
-                            if from == MessageIdReply (Id.unsafe 58782) (Id.unsafe 2596296) then
-                                Parser.succeed Nothing
-
-                            else
-                                ("While parsing " ++ messageIdToString from ++ ", could not find post for reply id " ++ Id.toString id)
-                                    |> Parser.problem
-                )
-        , Parser.succeed (\reply -> Just (MessageIdPost (Id.unsafe reply)))
-            |. Parser.oneOf
-                [ Parser.token "/posts/"
-                , Parser.token "https://glowfic.com/posts/"
-                ]
-            |= Parser.int
-        , Parser.succeed Nothing
-            |. Parser.oneOf
-                [ Parser.token "https://www.d20pfsrd.com/"
-                , Parser.token "https://www.aonprd.com/"
-                , Parser.token "https://en.wikipedia.org/"
-                , Parser.token "https://www.willowandroxas.com/"
-                ]
-            |. Parser.chompWhile (\_ -> True)
-        ]
-        |. Parser.end
 
 
 getCharacter :
@@ -626,19 +496,6 @@ viewPostTitles appData =
 --                     |> String.replace "{pid}" (Id.toString pid)
 --                     |> Html.text
 --                 ]
-
-
-messageIdToString : MessageId -> String
-messageIdToString id =
-    case id of
-        MessageIdPost pid ->
-            "Post {pid}"
-                |> String.replace "{pid}" (Id.toString pid)
-
-        MessageIdReply pid rid ->
-            "Reply {rid} from post {pid}"
-                |> String.replace "{rid}" (Id.toString rid)
-                |> String.replace "{pid}" (Id.toString pid)
 
 
 viewPostCharacters : Data -> PostDetails -> List Reply -> List (Html msg)
