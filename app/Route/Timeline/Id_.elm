@@ -135,11 +135,32 @@ data params =
     Do.do (GlowficApi.Extra.getAllBoardsIdPosts break2 authorization continuityId) <| \( results, break3 ) ->
     DoExtra.eachCountWithCircuitBreaker break3 results (\brk post -> GlowficApi.Extra.getPost brk authorization post.id) <| \( posts, break4 ) ->
     let
+        frequency : SeqDict (Id CharacterId) Int
+        frequency =
+            posts
+                |> List.map (\post -> allCharactersIds post |> SeqDict.map (\_ _ -> 1))
+                |> List.foldl
+                    (\e a ->
+                        SeqDict.merge
+                            SeqDict.insert
+                            (\k v1 v2 d -> SeqDict.insert k (v1 + v2) d)
+                            SeqDict.insert
+                            e
+                            a
+                            SeqDict.empty
+                    )
+                    SeqDict.empty
+
         charactersIds : List (Id CharacterId)
         charactersIds =
-            List.concatMap (\p -> allCharactersIds p |> SeqDict.keys) posts
-                |> SeqSet.fromList
-                |> SeqSet.toList
+            frequency
+                |> SeqDict.keys
+                |> List.sortBy
+                    (\id ->
+                        SeqDict.get id frequency
+                            |> Maybe.withDefault 0
+                            |> negate
+                    )
     in
     Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("🧑 Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
     DoExtra.eachCountWithCircuitBreaker break4 (assignColors charactersIds) (\brk ( id, color ) -> getCharacter brk authorization id color) <| \( characters, _ ) ->
@@ -390,32 +411,9 @@ view app _ =
     { title = app.data.name
     , body =
         let
-            frequency : SeqDict (Id CharacterId) Int
-            frequency =
-                app.data.posts
-                    |> SeqDict.values
-                    |> List.map (\post -> allCharactersIds post |> SeqDict.map (\_ _ -> 1))
-                    |> List.foldl
-                        (\e a ->
-                            SeqDict.merge
-                                SeqDict.insert
-                                (\k v1 v2 d -> SeqDict.insert k (v1 + v2) d)
-                                SeqDict.insert
-                                e
-                                a
-                                SeqDict.empty
-                        )
-                        SeqDict.empty
-
             columns : List String
             columns =
                 SeqDict.keys app.data.characters
-                    |> List.sortBy
-                        (\id ->
-                            SeqDict.get id frequency
-                                |> Maybe.withDefault 0
-                                |> negate
-                        )
                     |> List.map (\id -> "[c" ++ Id.toString id ++ "-start] auto")
 
             rows : List String
