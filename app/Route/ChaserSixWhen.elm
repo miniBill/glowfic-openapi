@@ -7,7 +7,7 @@ import GlowficApi.Extra
 import GlowficApi.Types exposing (PostDetails, Reply)
 import Head
 import Head.Seo as Seo
-import Html exposing (Html)
+import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Parser
 import Id exposing (Id, PostId)
@@ -129,22 +129,27 @@ viewThread posts id =
                 [ Html.Attributes.class "thread"
                 , threadWidth posts replies
                 ]
-                (Html.div []
-                    [ Html.div
-                        [ Html.Attributes.class "subject" ]
-                        [ Html.text post.subject ]
-                    , case post.description of
-                        OpenApi.Common.Null ->
-                            Html.text ""
-
-                        OpenApi.Common.Present description ->
-                            Html.div
-                                [ Html.Attributes.class "description" ]
-                                [ Html.text description ]
-                    ]
+                (viewHeader post
                     :: View.Post.viewPost post
                     :: viewReplies posts replies
                 )
+
+
+viewHeader : PostDetails -> Html msg
+viewHeader post =
+    Html.div []
+        [ Html.div
+            [ Html.Attributes.class "subject" ]
+            [ Html.text post.subject ]
+        , case post.description of
+            OpenApi.Common.Null ->
+                Html.text ""
+
+            OpenApi.Common.Present description ->
+                Html.div
+                    [ Html.Attributes.class "description" ]
+                    [ Html.text description ]
+        ]
 
 
 threadWidth : SeqDict (Id PostId) ( PostDetails, List Reply ) -> List Reply -> Html.Attribute msg

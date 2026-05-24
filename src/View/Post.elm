@@ -1,4 +1,4 @@
-module View.Post exposing (viewPost, viewReply)
+module View.Post exposing (viewPost, viewReply, viewThread)
 
 import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
 import GlowficRoute
@@ -7,6 +7,7 @@ import Html.Attributes
 import Html.Parser
 import Html.Parser.Util
 import Id
+import OpenApi.Common
 import Url
 
 
@@ -130,3 +131,29 @@ viewContent reply =
 
         Ok node ->
             Html.Parser.Util.toVirtualDom node
+
+
+viewThread : ( PostDetails, List Reply ) -> Html msg
+viewThread ( post, replies ) =
+    Html.div
+        [ Html.Attributes.class "thread"
+        , Html.Attributes.style "color" "#f3f3f3"
+        , Html.Attributes.style "padding" "10px"
+        , Html.Attributes.style "background" "#211e2f"
+        ]
+        (Html.div []
+            [ Html.div
+                [ Html.Attributes.class "subject" ]
+                [ Html.text post.subject ]
+            , case post.description of
+                OpenApi.Common.Null ->
+                    Html.text ""
+
+                OpenApi.Common.Present description ->
+                    Html.div
+                        [ Html.Attributes.class "description" ]
+                        [ Html.text description ]
+            ]
+            :: viewPost post
+            :: List.map viewReply replies
+        )

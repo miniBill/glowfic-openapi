@@ -23,6 +23,7 @@ import Pages.Url
 import Parser exposing ((|.), (|=), Parser)
 import Result.Extra
 import Rope exposing (Rope)
+import Route
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
 import SeqDict.Extra
@@ -526,9 +527,8 @@ viewPostTitles appData =
         |> SeqDict.values
         |> List.map
             (\( post, _ ) ->
-                Html.a
-                    [ Html.Attributes.href (GlowficRoute.post (Id.for post))
-                    , Html.Attributes.style "display" "block"
+                Route.link
+                    [ Html.Attributes.style "display" "block"
                     , Html.Attributes.style "grid-row-start" "post-name-start"
                     , Html.Attributes.style "grid-column-start" ("p" ++ Id.toString post.id ++ "-start")
                     , Html.Attributes.style "writing-mode" "vertical-rl"
@@ -536,6 +536,7 @@ viewPostTitles appData =
                     ]
                     [ Html.text (String.Extra.ellipsis (String.length "Eighty-Eight Million Eight Hundred and Eighty-Eight Tho") post.subject)
                     ]
+                    (Route.Timeline__Post__Id_ { id = Id.toString post.id })
             )
 
 
