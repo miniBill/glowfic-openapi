@@ -9,6 +9,8 @@ import GlowficApi.Extra
 import GlowficApi.Types exposing (PostDetails, Reply)
 import Head
 import Head.Seo as Seo
+import Html exposing (Attribute, Html)
+import Html.Attributes
 import Html.Parser
 import Id exposing (Id, PostId, ReplyId)
 import List.Extra
@@ -37,11 +39,11 @@ type alias Data =
 
 
 type alias Model =
-    { annotations : SeqDict (Id ReplyId) (List Annotation) }
+    { annotations : SeqDict MessageId (List Annotation) }
 
 
-type alias Msg =
-    ()
+type Msg
+    = AnnotationsChanged MessageId (List Annotation)
 
 
 type alias RouteParams =
@@ -76,8 +78,11 @@ subscriptions _ _ _ _ =
 update : App Data ActionData RouteParams -> Shared.Model -> Msg -> Model -> ( Model, Effect Msg )
 update app _ msg model =
     case msg of
-        () ->
-            ( model, Effect.none )
+        AnnotationsChanged id [] ->
+            ( { model | annotations = SeqDict.remove id model.annotations }, Effect.none )
+
+        AnnotationsChanged id newAnnotations ->
+            ( { model | annotations = SeqDict.insert id newAnnotations model.annotations }, Effect.none )
 
 
 head : App Data ActionData RouteParams -> List Head.Tag
@@ -124,11 +129,42 @@ monad params =
     Monad.succeed (Response.render post)
 
 
-view : App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg ())
+view : App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg Msg)
 view app _ model =
     { title = (Tuple.first app.data).subject
-    , body = [ View.Post.viewThread app.data ]
+    , body = [ Html.map PagesMsg.fromMsg (viewThread model app.data) ]
     }
+
+
+viewThread : Model -> ( PostDetails, List Reply ) -> Html Msg
+viewThread model ( post, replies ) =
+    Html.div
+        [ Html.Attributes.class "thread"
+        , Html.Attributes.style "color" "#f3f3f3"
+        , Html.Attributes.style "padding" "8px"
+        , Html.Attributes.style "background" "#211e2f"
+        , Html.Attributes.style "display" "grid"
+        , Html.Attributes.style "grid-template-columns" "1fr auto"
+        , Html.Attributes.style "gap" "0 8px"
+        ]
+        (View.Post.viewHeader [ Html.Attributes.style "grid-column" "1 / span 2" ] post
+            :: View.Post.viewTopPost [] post
+            :: viewAnnotations [] model (MessageIdPost post.id)
+            :: List.concatMap
+                (\reply ->
+                    [ View.Post.viewReply [] reply
+                    , viewAnnotations [] model (MessageIdReply post.id reply.id)
+                    ]
+                )
+                replies
+        )
+
+
+viewAnnotations : List (Attribute Msg) -> Model -> MessageId -> Html Msg
+viewAnnotations attrs model messageId =
+    [ Html.text "Annotations" ]
+        |> List.map (Html.map (AnnotationsChanged messageId))
+        |> Html.div attrs
 
 
 calculatePostsLinks : List ( { a | id : Id PostId }, List { b | id : Id ReplyId } ) -> Result ( String, List Parser.DeadEnd ) (List MessageId)

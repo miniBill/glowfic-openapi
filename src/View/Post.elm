@@ -1,8 +1,8 @@
-module View.Post exposing (viewPost, viewReply, viewThread)
+module View.Post exposing (viewHeader, viewReply, viewThread, viewTopPost)
 
 import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
 import GlowficRoute
-import Html exposing (Html)
+import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Parser
 import Html.Parser.Util
@@ -11,10 +11,53 @@ import OpenApi.Common
 import Url
 
 
-viewPost : PostDetails -> Html msg
-viewPost post =
+viewHeader : List (Attribute msg) -> PostDetails -> Html msg
+viewHeader attrs post =
+    Html.div attrs
+        [ Html.div
+            [ Html.Attributes.class "subject" ]
+            [ Html.text post.subject ]
+        , case post.description of
+            OpenApi.Common.Null ->
+                Html.text ""
+
+            OpenApi.Common.Present description ->
+                Html.div
+                    [ Html.Attributes.class "description" ]
+                    [ Html.text description ]
+        ]
+
+
+viewThread : ( PostDetails, List Reply ) -> Html msg
+viewThread ( post, replies ) =
     Html.div
-        [ Html.Attributes.class "reply" ]
+        [ Html.Attributes.class "thread"
+        , Html.Attributes.style "color" "#f3f3f3"
+        , Html.Attributes.style "padding" "10px"
+        , Html.Attributes.style "background" "#211e2f"
+        ]
+        (Html.div []
+            [ Html.div
+                [ Html.Attributes.class "subject" ]
+                [ Html.text post.subject ]
+            , case post.description of
+                OpenApi.Common.Null ->
+                    Html.text ""
+
+                OpenApi.Common.Present description ->
+                    Html.div
+                        [ Html.Attributes.class "description" ]
+                        [ Html.text description ]
+            ]
+            :: viewTopPost [] post
+            :: List.map (viewReply []) replies
+        )
+
+
+viewTopPost : List (Attribute msg) -> PostDetails -> Html msg
+viewTopPost attrs post =
+    Html.div
+        (Html.Attributes.class "reply" :: attrs)
         [ viewCharacter
             { character = post.character
             , icon = post.icon
@@ -34,10 +77,10 @@ viewPost post =
         ]
 
 
-viewReply : Reply -> Html msg
-viewReply reply =
+viewReply : List (Attribute msg) -> Reply -> Html msg
+viewReply attrs reply =
     Html.div
-        [ Html.Attributes.class "reply" ]
+        (Html.Attributes.class "reply" :: attrs)
         [ viewCharacter reply
         , Html.div
             [ Html.Attributes.class "content" ]
@@ -131,29 +174,3 @@ viewContent reply =
 
         Ok node ->
             Html.Parser.Util.toVirtualDom node
-
-
-viewThread : ( PostDetails, List Reply ) -> Html msg
-viewThread ( post, replies ) =
-    Html.div
-        [ Html.Attributes.class "thread"
-        , Html.Attributes.style "color" "#f3f3f3"
-        , Html.Attributes.style "padding" "10px"
-        , Html.Attributes.style "background" "#211e2f"
-        ]
-        (Html.div []
-            [ Html.div
-                [ Html.Attributes.class "subject" ]
-                [ Html.text post.subject ]
-            , case post.description of
-                OpenApi.Common.Null ->
-                    Html.text ""
-
-                OpenApi.Common.Present description ->
-                    Html.div
-                        [ Html.Attributes.class "description" ]
-                        [ Html.text description ]
-            ]
-            :: viewPost post
-            :: List.map viewReply replies
-        )

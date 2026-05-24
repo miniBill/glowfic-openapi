@@ -129,27 +129,10 @@ viewThread posts id =
                 [ Html.Attributes.class "thread"
                 , threadWidth posts replies
                 ]
-                (viewHeader post
-                    :: View.Post.viewPost post
+                (View.Post.viewHeader [] post
+                    :: View.Post.viewTopPost [] post
                     :: viewReplies posts replies
                 )
-
-
-viewHeader : PostDetails -> Html msg
-viewHeader post =
-    Html.div []
-        [ Html.div
-            [ Html.Attributes.class "subject" ]
-            [ Html.text post.subject ]
-        , case post.description of
-            OpenApi.Common.Null ->
-                Html.text ""
-
-            OpenApi.Common.Present description ->
-                Html.div
-                    [ Html.Attributes.class "description" ]
-                    [ Html.text description ]
-        ]
 
 
 threadWidth : SeqDict (Id PostId) ( PostDetails, List Reply ) -> List Reply -> Html.Attribute msg
@@ -206,13 +189,13 @@ viewReplies posts replies =
                         [ Html.Attributes.class "split" ]
                         [ Html.div
                             [ Html.Attributes.class "thread", threadWidth posts t ]
-                            (View.Post.viewReply h :: viewReplies posts t)
+                            (View.Post.viewReply [] h :: viewReplies posts t)
                         , viewThread posts id
                         ]
                     ]
 
                 Nothing ->
-                    View.Post.viewReply h :: viewReplies posts t
+                    View.Post.viewReply [] h :: viewReplies posts t
 
 
 findLink : String -> Maybe (Id PostId)
