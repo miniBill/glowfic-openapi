@@ -105,49 +105,6 @@ paths:
                 "422":
                     description: Invalid parameters provided
             security: []
-    /board_sections/reorder:
-        post:
-            tags:
-                - Subcontinuities
-            summary: Update the order of subcontinuities. This is an unstable feature, and may be moved or renamed; it should not be trusted.
-            operationId: post_board_sections_reorder
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            type: object
-                            properties:
-                                ordered_section_ids:
-                                    type: array
-                                    items:
-                                        oneOf:
-                                            - type: integer
-                                            - type: string
-                required: true
-            responses:
-                "200":
-                    description: Successful operation
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                properties:
-                                    section_ids:
-                                        type: array
-                                        items:
-                                            type: integer
-                "401":
-                    description: You must be logged in
-                    content: {}
-                "403":
-                    description: Continuity is not editable by the user
-                    content: {}
-                "404":
-                    description: Section IDs could not be found
-                    content: {}
-                "422":
-                    description: Invalid parameters provided
-                    content: {}
     /boards:
         get:
             tags:
@@ -199,31 +156,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: object
-                                properties:
-                                    id:
-                                        type: integer
-                                    name:
-                                        type: string
-                                    board_sections:
-                                        type: array
-                                        items:
-                                            type: object
-                                            properties:
-                                                id:
-                                                    type: integer
-                                                name:
-                                                    type: string
-                                                order:
-                                                    type: integer
-                                            required:
-                                                - id
-                                                - name
-                                                - order
-                                required:
-                                    - id
-                                    - name
-                                    - board_sections
+                                $ref: "#/components/schemas/Board"
                 404:
                     description: Continuity not found
                     $ref: "#/components/responses/404"
@@ -296,6 +229,7 @@ paths:
                             properties:
                                 reply_id:
                                     type: integer
+                                    format: Id ReplyId
                                     description: Reply ID
                                 name:
                                     type: string
@@ -544,7 +478,8 @@ paths:
                                 ordered_characters_gallery_ids:
                                     type: array
                                     items:
-                                        type: string
+                                        type: integer
+                                        format: Id GalleryId
             responses:
                 "200":
                     description: Successful operation
@@ -639,9 +574,11 @@ paths:
                                 ordered_post_ids:
                                     type: array
                                     items:
-                                        type: string
+                                        type: integer
+                                        format: Id PostId
                                 section_id:
                                     type: integer
+                                    format: Id BoardSectionId
             responses:
                 "200":
                     description: Successful operation
@@ -675,7 +612,8 @@ paths:
                                 ordered_section_ids:
                                     type: array
                                     items:
-                                        type: string
+                                        type: integer
+                                        format: Id BoardSectionId
             responses:
                 "200":
                     description: Successful operation
@@ -809,7 +747,8 @@ paths:
                                 ordered_post_ids:
                                     type: array
                                     items:
-                                        type: string
+                                        type: integer
+                                        format: Id PostId
                                 section_id:
                                     type: integer
             responses:
@@ -895,6 +834,49 @@ paths:
                     content: {}
                 "404":
                     description: Reply or user not found
+                    content: {}
+                "422":
+                    description: Invalid parameters provided
+                    content: {}
+    /subcontinuities/reorder:
+        post:
+            tags:
+                - Subcontinuities
+            summary: Update the order of subcontinuities. This is an unstable feature, and may be moved or renamed; it should not be trusted.
+            operationId: post_board_sections_reorder
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                ordered_section_ids:
+                                    type: array
+                                    items:
+                                        type: integer
+                                        format: Id BoardSectionId
+                required: true
+            responses:
+                "200":
+                    description: Successful operation
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    section_ids:
+                                        type: array
+                                        items:
+                                            type: integer
+                                            format: Id BoardSectionId
+                "401":
+                    description: You must be logged in
+                    content: {}
+                "403":
+                    description: Continuity is not editable by the user
+                    content: {}
+                "404":
+                    description: Section IDs could not be found
                     content: {}
                 "422":
                     description: Invalid parameters provided
@@ -1125,16 +1107,39 @@ components:
             properties:
                 id:
                     type: integer
+                    format: Id BoardId
                 name:
                     type: string
+                board_sections:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/BoardSection"
             required:
                 - id
+                - name
+                - board_sections
+
+        BoardSection:
+            type: object
+            properties:
+                id:
+                    type: integer
+                    format: Id BoardSectionId
+                name:
+                    type: string
+                order:
+                    type: integer
+            required:
+                - id
+                - name
+                - order
 
         Character:
             type: object
             properties:
                 id:
                     type: integer
+                    format: Id CharacterId
                 name:
                     type: string
                 screenname:
@@ -1148,6 +1153,7 @@ components:
             properties:
                 id:
                     type: integer
+                    format: Id CharacterId
                 name:
                     type: string
                 screenname:
@@ -1159,6 +1165,7 @@ components:
                     properties:
                         id:
                             type: integer
+                            format: Id IconId
                         url:
                             type: string
                             format: uri
@@ -1174,6 +1181,7 @@ components:
                         properties:
                             id:
                                 type: integer
+                                format: Id AliasId
                             name:
                                 type: string
                         required:
@@ -1199,6 +1207,7 @@ components:
             properties:
                 id:
                     type: integer
+                    format: Id IconId
                 url:
                     type: string
                     format: uri
@@ -1230,6 +1239,7 @@ components:
             properties:
                 id:
                     type: integer
+                    format: Id PostId
                 subject:
                     type: string
                 created_at:
@@ -1249,7 +1259,15 @@ components:
                     type: string
                     format: date-time
                 board:
-                    $ref: "#/components/schemas/Board"
+                    type: object
+                    properties:
+                        id:
+                            type: integer
+                            format: Id BoardId
+                        name:
+                            type: string
+                    required:
+                        - id
                 section:
                     type: object
                     nullable: true
@@ -1277,6 +1295,7 @@ components:
             properties:
                 id:
                     type: integer
+                    format: Id ReplyId
                 content:
                     type: string
                 created_at:
@@ -1309,6 +1328,7 @@ components:
             properties:
                 id:
                     type: integer
+                    format: Id UserId
                 username:
                     type: string
             required:
