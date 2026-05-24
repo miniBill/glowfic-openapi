@@ -1,6 +1,6 @@
 module Route.Timeline.Post.Id_ exposing (ActionData, Data, Model, Msg, RouteParams, route)
 
-import Annotation exposing (Annotation, MessageId(..))
+import Annotation exposing (Annotation(..), MessageId(..))
 import BackendTask exposing (BackendTask)
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
@@ -11,6 +11,7 @@ import Head
 import Head.Seo as Seo
 import Html exposing (Attribute, Html)
 import Html.Attributes
+import Html.Events
 import Html.Parser
 import Id exposing (Id, PostId, ReplyId)
 import List.Extra
@@ -19,6 +20,7 @@ import Monad.Do as Do
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
 import Parser exposing ((|.), (|=), Parser)
+import Parser.Extra
 import Result.Extra
 import Rope exposing (Rope)
 import RouteBuilder exposing (App, StatefulRoute)
@@ -35,7 +37,9 @@ type alias ActionData =
 
 
 type alias Data =
-    ( PostDetails, List Reply )
+    { post : ( PostDetails, List Reply )
+    , annotations : SeqDict MessageId (List Annotation)
+    }
 
 
 type alias Model =
@@ -66,8 +70,8 @@ route =
 
 
 init : App Data ActionData RouteParams -> Shared.Model -> ( Model, Effect Msg )
-init _ _ =
-    ( { annotations = SeqDict.empty }, Effect.none )
+init app _ =
+    ( { annotations = app.data.annotations }, Effect.none )
 
 
 subscriptions : RouteParams -> UrlPath -> Shared.Model -> Model -> Sub Msg
@@ -126,13 +130,25 @@ monad params =
         )
     <| \postId ->
     Do.do (GlowficApi.Extra.getPost postId) <| \post ->
-    Monad.succeed (Response.render post)
+    Do.do (calculatePostAnnotations post) <| \annotations ->
+    let
+        result : Data
+        result =
+            { post = post
+            , annotations =
+                annotations
+                    |> List.Extra.gatherEqualsBy Tuple.first
+                    |> List.map (\( ( k, h ), t ) -> ( k, h :: List.map Tuple.second t ))
+                    |> SeqDict.fromList
+            }
+    in
+    Monad.succeed (Response.render result)
 
 
 view : App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg Msg)
 view app _ model =
-    { title = (Tuple.first app.data).subject
-    , body = [ Html.map PagesMsg.fromMsg (viewThread model app.data) ]
+    { title = (Tuple.first app.data.post).subject
+    , body = [ Html.map PagesMsg.fromMsg (viewThread model app.data.post) ]
     }
 
 
@@ -153,7 +169,7 @@ viewThread model ( post, replies ) =
             :: List.concatMap
                 (\reply ->
                     [ View.Post.viewReply [] reply
-                    , viewAnnotations [] model (MessageIdReply post.id reply.id)
+                    , viewAnnotations [] model (MessageIdReply reply.id)
                     ]
                 )
                 replies
@@ -162,78 +178,173 @@ viewThread model ( post, replies ) =
 
 viewAnnotations : List (Attribute Msg) -> Model -> MessageId -> Html Msg
 viewAnnotations attrs model messageId =
-    [ Html.text "Annotations" ]
+    let
+        annotations : List Annotation
+        annotations =
+            SeqDict.get messageId model.annotations
+                |> Maybe.withDefault []
+
+        addButton : Html (List Annotation)
+        addButton =
+            Html.button
+                [-- Html.Events.onClick (annotations ++ [ emptyAnnotation ])
+                ]
+                [ Html.text "➕" ]
+    in
+    (List.indexedMap
+        (\i annotation ->
+            viewAnnotation annotation
+                |> Html.map (\newAnnotation -> List.Extra.setAt i newAnnotation annotations)
+        )
+        annotations
+        ++ [ addButton ]
+    )
         |> List.map (Html.map (AnnotationsChanged messageId))
         |> Html.div attrs
 
 
-calculatePostsLinks : List ( { a | id : Id PostId }, List { b | id : Id ReplyId } ) -> Result ( String, List Parser.DeadEnd ) (List MessageId)
-calculatePostsLinks posts =
+viewAnnotation : Annotation -> Html Annotation
+viewAnnotation annotation =
     let
-        replyToPost : SeqDict (Id ReplyId) (Id PostId)
-        replyToPost =
-            posts
-                |> List.concatMap
-                    (\( p, rs ) ->
-                        let
-                            pid =
-                                Id.for p
-                        in
-                        List.map (\r -> ( Id.for r, pid )) rs
-                    )
-                |> SeqDict.fromList
+        idInt : Int
+        idInt =
+            case annotation of
+                Enter id ->
+                    Id.toInt id
+
+                Exit id ->
+                    Id.toInt id
+
+                HappensBefore (MessageIdPost id) ->
+                    Id.toInt id
+
+                HappensBefore (MessageIdReply id) ->
+                    Id.toInt id
+
+                HappensAfter (MessageIdPost id) ->
+                    Id.toInt id
+
+                HappensAfter (MessageIdReply id) ->
+                    Id.toInt id
+
+        selectOptions : List ( String, Annotation )
+        selectOptions =
+            [ ( "Enter id", Enter (Id.unsafe idInt) )
+            , ( "Exit id", Exit (Id.unsafe idInt) )
+            , ( "Happens before post", HappensBefore (MessageIdPost (Id.unsafe idInt)) )
+            , ( "Happens before reply", HappensBefore (MessageIdReply (Id.unsafe idInt)) )
+            , ( "Happens after post", HappensAfter (MessageIdPost (Id.unsafe idInt)) )
+            , ( "Happens after reply", HappensAfter (MessageIdReply (Id.unsafe idInt)) )
+            ]
+
+        changeId : String -> Annotation
+        changeId newIdString =
+            let
+                newId : Int
+                newId =
+                    Maybe.withDefault idInt (String.toInt newIdString)
+            in
+            case annotation of
+                Enter _ ->
+                    Enter (Id.unsafe newId)
+
+                Exit _ ->
+                    Exit (Id.unsafe newId)
+
+                HappensBefore (MessageIdPost _) ->
+                    HappensBefore (MessageIdPost (Id.unsafe newId))
+
+                HappensBefore (MessageIdReply _) ->
+                    HappensBefore (MessageIdReply (Id.unsafe newId))
+
+                HappensAfter (MessageIdPost _) ->
+                    HappensAfter (MessageIdPost (Id.unsafe newId))
+
+                HappensAfter (MessageIdReply _) ->
+                    HappensAfter (MessageIdReply (Id.unsafe newId))
     in
-    calculatePostsLinksHelper replyToPost []
+    Html.div
+        [ Html.Attributes.style "display" "flex"
+        , Html.Attributes.style "flex-direction" "column"
+        , Html.Attributes.style "gap" "4px"
+        ]
+        [ selectOptions
+            |> List.map
+                (\( label, value ) ->
+                    Html.option
+                        [ Html.Attributes.selected (value == annotation)
+                        , Html.Attributes.value label
+                        ]
+                        [ Html.text label ]
+                )
+            |> Html.select
+                [ Html.Events.onInput
+                    (\key ->
+                        selectOptions
+                            |> List.Extra.findMap
+                                (\( k, v ) ->
+                                    if k == key then
+                                        Just v
+
+                                    else
+                                        Nothing
+                                )
+                            |> Maybe.withDefault annotation
+                    )
+                ]
+        , Html.input
+            [ Html.Events.onInput changeId
+            , Html.Attributes.value (String.fromInt idInt)
+            ]
+            []
+        ]
 
 
-calculatePostsLinksHelper : SeqDict (Id ReplyId) (Id PostId) -> List ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (List MessageId)
-calculatePostsLinksHelper replyToPost posts =
-    posts
-        |> Result.Extra.combineMap (calculatePostLinks replyToPost)
-        |> Result.map
-            (\rs ->
-                rs
-                    |> Rope.fromRopeList
-                    |> Rope.toList
-            )
+calculatePostAnnotations : ( PostDetails, List Reply ) -> Monad (List ( MessageId, Annotation ))
+calculatePostAnnotations ( post, replies ) =
+    let
+        result =
+            Result.map2 (\l r -> Rope.appendTo l r |> Rope.toList)
+                (calculatePostDetailsAnnotations post)
+                (Result.map Rope.fromRopeList (Result.Extra.combineMap (calculateReplyAnnotations post) replies))
+    in
+    case result of
+        Ok o ->
+            Monad.succeed o
+
+        Err ( t, e ) ->
+            Monad.failString (Parser.Extra.errorToString t e)
 
 
-calculatePostLinks : SeqDict (Id ReplyId) (Id PostId) -> ( PostDetails, List Reply ) -> Result ( String, List Parser.DeadEnd ) (Rope MessageId)
-calculatePostLinks replyToPost ( post, replies ) =
-    Result.map2 Rope.appendTo
-        (calculatePostDetailsLinks replyToPost post)
-        (Result.map Rope.fromRopeList (Result.Extra.combineMap (calculateReplyLinks replyToPost post) replies))
+calculatePostDetailsAnnotations : PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
+calculatePostDetailsAnnotations ({ content } as p) =
+    calculateContentAnnotations (MessageIdPost (Id.for p)) content
 
 
-calculatePostDetailsLinks : SeqDict (Id ReplyId) (Id PostId) -> PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope MessageId)
-calculatePostDetailsLinks replyToPost ({ content } as p) =
-    calculateContentLinks replyToPost (MessageIdPost (Id.for p)) content
+calculateReplyAnnotations : PostDetails -> Reply -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
+calculateReplyAnnotations post reply =
+    calculateContentAnnotations (MessageIdReply (Id.for reply)) reply.content
 
 
-calculateReplyLinks : SeqDict (Id ReplyId) (Id PostId) -> PostDetails -> Reply -> Result ( String, List Parser.DeadEnd ) (Rope MessageId)
-calculateReplyLinks replyToPost post reply =
-    calculateContentLinks replyToPost (MessageIdReply (Id.for post) (Id.for reply)) reply.content
-
-
-calculateContentLinks : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope MessageId)
-calculateContentLinks replyToPost from content =
+calculateContentAnnotations : MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
+calculateContentAnnotations from content =
     case Html.Parser.run Html.Parser.noCharRefs content of
         Err e ->
             Err ( content, e )
 
         Ok parsed ->
             parsed
-                |> Result.Extra.combineMap (calculateNodeLinks replyToPost from)
+                |> Result.Extra.combineMap (calculateNodeLinks from)
                 |> Result.map Rope.fromRopeList
 
 
-calculateNodeLinks : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> Html.Parser.Node -> Result ( String, List Parser.DeadEnd ) (Rope MessageId)
-calculateNodeLinks replyToPost from node =
+calculateNodeLinks : MessageId -> Html.Parser.Node -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
+calculateNodeLinks from node =
     case node of
         Html.Parser.Element "a" attrs children ->
             case List.Extra.find (\( attrName, _ ) -> attrName == "href") attrs of
                 Just ( _, target ) ->
-                    case Parser.run (targetParser replyToPost from) target of
+                    case Parser.run (targetParser from) target of
                         Err e ->
                             Err ( target, e )
 
@@ -241,16 +352,16 @@ calculateNodeLinks replyToPost from node =
                             Ok Rope.empty
 
                         Ok (Just to) ->
-                            Ok (Rope.singleton to)
+                            Ok (Rope.singleton ( from, HappensAfter to ))
 
                 Nothing ->
                     children
-                        |> Result.Extra.combineMap (calculateNodeLinks replyToPost from)
+                        |> Result.Extra.combineMap (calculateNodeLinks from)
                         |> Result.map Rope.fromRopeList
 
         Html.Parser.Element _ _ children ->
             children
-                |> Result.Extra.combineMap (calculateNodeLinks replyToPost from)
+                |> Result.Extra.combineMap (calculateNodeLinks from)
                 |> Result.map Rope.fromRopeList
 
         Html.Parser.Text _ ->
@@ -260,10 +371,10 @@ calculateNodeLinks replyToPost from node =
             Ok Rope.empty
 
 
-targetParser : SeqDict (Id ReplyId) (Id PostId) -> MessageId -> Parser (Maybe MessageId)
-targetParser replyToPost from =
+targetParser : MessageId -> Parser (Maybe MessageId)
+targetParser from =
     Parser.oneOf
-        [ Parser.succeed Id.unsafe
+        [ Parser.succeed (\reply -> Just (MessageIdReply (Id.unsafe reply)))
             |. Parser.oneOf
                 [ Parser.token "/replies/"
                 , Parser.token "https://glowfic.com/replies/"
@@ -271,21 +382,7 @@ targetParser replyToPost from =
             |= Parser.int
             |. Parser.token "#reply-"
             |. Parser.int
-            |> Parser.andThen
-                (\id ->
-                    case SeqDict.get id replyToPost of
-                        Just pid ->
-                            Parser.succeed (Just (MessageIdReply pid id))
-
-                        Nothing ->
-                            if from == MessageIdReply (Id.unsafe 58782) (Id.unsafe 2596296) then
-                                Parser.succeed Nothing
-
-                            else
-                                ("While parsing " ++ Annotation.messageIdToString from ++ ", could not find post for reply id " ++ Id.toString id)
-                                    |> Parser.problem
-                )
-        , Parser.succeed (\reply -> Just (MessageIdPost (Id.unsafe reply)))
+        , Parser.succeed (\post -> Just (MessageIdPost (Id.unsafe post)))
             |. Parser.oneOf
                 [ Parser.token "/posts/"
                 , Parser.token "https://glowfic.com/posts/"
@@ -293,9 +390,9 @@ targetParser replyToPost from =
             |= Parser.int
         , Parser.succeed Nothing
             |. Parser.oneOf
-                [ Parser.token "https://www.d20pfsrd.com/"
+                [ Parser.token "https://en.wikipedia.org/"
                 , Parser.token "https://www.aonprd.com/"
-                , Parser.token "https://en.wikipedia.org/"
+                , Parser.token "https://www.d20pfsrd.com/"
                 , Parser.token "https://www.willowandroxas.com/"
                 ]
             |. Parser.chompWhile (\_ -> True)

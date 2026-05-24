@@ -11,7 +11,7 @@ type Annotation
 
 
 type MessageId
-    = MessageIdReply (Id PostId) (Id ReplyId)
+    = MessageIdReply (Id ReplyId)
     | MessageIdPost (Id PostId)
 
 
@@ -22,7 +22,6 @@ messageIdToString id =
             "Post {pid}"
                 |> String.replace "{pid}" (Id.toString pid)
 
-        MessageIdReply pid rid ->
-            "Reply {rid} from post {pid}"
+        MessageIdReply rid ->
+            "Reply {rid}"
                 |> String.replace "{rid}" (Id.toString rid)
-                |> String.replace "{pid}" (Id.toString pid)
