@@ -2,7 +2,6 @@ module Route.Timeline.Id_ exposing (ActionData, Data, Link, MessageId, Model, Ms
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
-import BackendTask.Do as Do
 import BackendTask.Do.Extra as DoExtra
 import Color.Oklch as Oklch exposing (Oklch)
 import ErrorPage exposing (ErrorPage)
@@ -18,6 +17,8 @@ import Html.Parser
 import Id exposing (BoardId, CharacterId, IconId, Id, PostId, ReplyId)
 import List.Extra
 import Maybe.Extra
+import Monad exposing (Monad)
+import Monad.Do as Do
 import OpenApi.Common
 import Pages.Url
 import Parser exposing ((|.), (|=), Parser)
@@ -115,12 +116,16 @@ head _ =
 
 data : RouteParams -> BackendTask FatalError (Response Data ErrorPage)
 data params =
+    Monad.run (monad params)
+
+
+monad : RouteParams -> Monad (Response Data ErrorPage)
+monad params =
     Do.do
         (case String.toInt params.id of
             Nothing ->
                 ("Invalid id: " ++ params.id)
-                    |> FatalError.fromString
-                    |> BackendTask.fail
+                    |> Monad.failString
 
             Just i ->
                 let
@@ -128,13 +133,12 @@ data params =
                     boardId =
                         Id.unsafe i
                 in
-                BackendTask.succeed boardId
+                Monad.succeed boardId
         )
     <| \continuityId ->
-    Do.do GlowficApi.Extra.login <| \( authorization, break1 ) ->
-    Do.do (GlowficApi.Extra.getBoard break1 authorization continuityId) <| \( board, break2 ) ->
-    Do.do (GlowficApi.Extra.getAllBoardsIdPosts break2 authorization continuityId) <| \( results, break3 ) ->
-    DoExtra.eachCountWithCircuitBreaker break3 results (\brk post -> GlowficApi.Extra.getPost brk authorization post.id) <| \( posts, break4 ) ->
+    Do.do (GlowficApi.Extra.getBoard continuityId) <| \board ->
+    Do.do (GlowficApi.Extra.getAllBoardsIdPosts continuityId) <| \results ->
+    Do.eachCount results (\post -> GlowficApi.Extra.getPost post.id) <| \posts ->
     let
         frequency : SeqDict (Id CharacterId) Int
         frequency =
@@ -164,7 +168,7 @@ data params =
                     )
     in
     Do.log (Ansi.Color.fontColor Ansi.Color.cyan ("🧑 Got " ++ String.fromInt (List.length charactersIds) ++ " characters, fetching icons")) <| \() ->
-    DoExtra.eachCountWithCircuitBreaker break4 (assignColors charactersIds) (\brk ( id, color ) -> getCharacter brk authorization id color) <| \( characters, _ ) ->
+    Do.eachCount (assignColors charactersIds) (\( id, color ) -> getCharacter id color) <| \characters ->
     let
         replyToPost : SeqDict (Id ReplyId) (Id PostId)
         replyToPost =
@@ -198,7 +202,7 @@ data params =
     in
     result
         |> Response.render
-        |> BackendTask.succeed
+        |> Monad.succeed
 
 
 assignColors : List id -> List ( id, Oklch )
@@ -351,24 +355,17 @@ targetParser replyToPost from =
 
 
 getCharacter :
-    { got429 : Bool }
-    -> { token : String }
-    -> Id CharacterId
+    Id CharacterId
     -> Oklch
-    ->
-        BackendTask
-            FatalError
-            ( Maybe ( Id CharacterId, CharacterSummary )
-            , { got429 : Bool }
-            )
-getCharacter got429 authorization id color =
-    GlowficApi.Extra.getCharacter got429 authorization id
-        |> BackendTask.map
-            (\( character, newGot429 ) ->
-                ( if character.npc then
+    -> Monad (Maybe ( Id CharacterId, CharacterSummary ))
+getCharacter id color =
+    GlowficApi.Extra.getCharacter id
+        |> Monad.map
+            (\character ->
+                if character.npc then
                     Nothing
 
-                  else
+                else
                     Just
                         ( id
                         , { name = character.name
@@ -382,8 +379,6 @@ getCharacter got429 authorization id color =
                                         Just { id = icon.id, url = icon.url }
                           }
                         )
-                , newGot429
-                )
             )
 
 

@@ -12,6 +12,7 @@ import Html.Attributes
 import Html.Parser
 import Id exposing (Id, PostId)
 import List.Extra
+import Monad exposing (Monad)
 import OpenApi.Common
 import Pages.Url
 import RouteBuilder exposing (App, StatelessRoute)
@@ -75,31 +76,31 @@ rootPost =
 
 data : BackendTask FatalError Data
 data =
-    Do.do GlowficApi.Extra.login <| \( token, got429 ) ->
-    go got429 token [ rootPost ] SeqDict.empty
+    go [ rootPost ] SeqDict.empty
+        |> Monad.run
 
 
-go : { got429 : Bool } -> { token : String } -> List (Id PostId) -> Data -> BackendTask FatalError Data
-go got429 token ids acc =
+go : List (Id PostId) -> Data -> Monad Data
+go ids acc =
     case ids of
         [] ->
-            BackendTask.succeed acc
+            Monad.succeed acc
 
         h :: t ->
             case SeqDict.get h acc of
                 Just _ ->
-                    go got429 token t acc
+                    go t acc
 
                 Nothing ->
-                    GlowficApi.Extra.getPost got429 token h
-                        |> BackendTask.andThen
-                            (\( ( post, replies ), newGot429 ) ->
+                    GlowficApi.Extra.getPost h
+                        |> Monad.andThen
+                            (\( post, replies ) ->
                                 let
                                     newIds =
                                         (post.content :: List.map .content replies)
                                             |> List.filterMap findLink
                                 in
-                                go newGot429 token (newIds ++ t) (SeqDict.insert h ( post, replies ) acc)
+                                go (newIds ++ t) (SeqDict.insert h ( post, replies ) acc)
                             )
 
 

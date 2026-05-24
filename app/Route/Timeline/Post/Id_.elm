@@ -1,7 +1,6 @@
 module Route.Timeline.Post.Id_ exposing (ActionData, Data, MessageId, Model, Msg, RouteParams, route)
 
-import BackendTask
-import BackendTask.Do as Do
+import BackendTask exposing (BackendTask)
 import Color.Oklch exposing (Oklch)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
@@ -11,6 +10,8 @@ import Head
 import Head.Seo as Seo
 import Http
 import Id exposing (Id, PostId)
+import Monad exposing (Monad)
+import Monad.Do as Do
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
 import Parser
@@ -81,14 +82,18 @@ head _ =
         |> Seo.website
 
 
-data : RouteParams -> BackendTask.BackendTask FatalError (Response Data ErrorPage)
+data : RouteParams -> BackendTask FatalError (Response Data ErrorPage)
 data params =
+    Monad.run (monad params)
+
+
+monad : RouteParams -> Monad (Response Data ErrorPage)
+monad params =
     Do.do
         (case String.toInt params.id of
             Nothing ->
                 ("Invalid id: " ++ params.id)
-                    |> FatalError.fromString
-                    |> BackendTask.fail
+                    |> Monad.failString
 
             Just i ->
                 let
@@ -96,22 +101,21 @@ data params =
                     boardId =
                         Id.unsafe i
                 in
-                BackendTask.succeed boardId
+                Monad.succeed boardId
         )
     <| \postId ->
-    Do.do GlowficApi.Extra.login <| \( authorization, break1 ) ->
-    Do.do (GlowficApi.Extra.getPost break1 authorization postId) <| \( post, break2 ) ->
+    Do.do (GlowficApi.Extra.getPost postId) <| \post ->
     { name = ""
     , post = post
     , enter = SeqDict.empty
     , exit = SeqDict.empty
     }
         |> Response.render
-        |> BackendTask.succeed
+        |> Monad.succeed
 
 
 view : RouteBuilder.App Data ActionData RouteParams -> Model -> View (PagesMsg ())
 view app model =
-    { title = "..."
+    { title = (Tuple.first app.data.post).subject
     , body = [ View.Post.viewThread app.data.post ]
     }
