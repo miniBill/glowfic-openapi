@@ -1,7 +1,7 @@
-module Glowfic.Utils exposing (allCharactersIds)
+module Glowfic.Utils exposing (allCharactersIds, annotationsFilename, annotationsFilepath)
 
 import GlowficApi.Types exposing (PostDetails, Reply)
-import Id exposing (CharacterId, Id)
+import Id exposing (CharacterId, Id, PostId)
 import Maybe.Extra
 import SeqDict exposing (SeqDict)
 import SeqDict.Extra
@@ -26,3 +26,13 @@ allCharactersIds ( post, replies ) =
     )
         |> Maybe.Extra.values
         |> SeqDict.Extra.groupByWith Tuple.first Tuple.second
+
+
+annotationsFilepath : Id PostId -> String
+annotationsFilepath postId =
+    "data/" ++ annotationsFilename postId
+
+
+annotationsFilename : Id PostId -> String
+annotationsFilename postId =
+    "annotations-" ++ Id.toString postId ++ ".json"

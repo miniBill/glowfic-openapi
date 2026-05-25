@@ -104,16 +104,11 @@ update app _ msg model =
             in
             ( model
             , Effect.saveFile
-                { filename = filenameForAnnotations postId
+                { filename = Glowfic.Utils.annotationsFilename postId
                 , mime = "application/json"
                 , content = Codec.encodeToString 2 annotationsCodec model.annotations
                 }
             )
-
-
-filenameForAnnotations : Id PostId -> String
-filenameForAnnotations postId =
-    "annotations-" ++ Id.toString postId ++ ".json"
 
 
 annotationsCodec : Codec (SeqDict MessageId (List Annotation))
@@ -193,7 +188,7 @@ monad params =
 
 readAnnotationsFromFile : Id PostId -> BackendTask FatalError (Maybe (List ( MessageId, Annotation )))
 readAnnotationsFromFile postId =
-    File.rawFile ("data/" ++ filenameForAnnotations postId)
+    File.rawFile (Glowfic.Utils.annotationsFilepath postId)
         |> BackendTask.toResult
         |> BackendTask.andThen
             (\raw ->
@@ -381,6 +376,7 @@ viewAnnotations attrs model characters messageCharacter state messageId =
                     (AnnotationsChanged messageId
                         (annotations ++ [ newAnnotation ])
                     )
+                , Html.Attributes.style "align-self" "start"
                 ]
                 [ Html.text "➕" ]
 
@@ -702,6 +698,7 @@ targetParser from =
             |. Parser.oneOf
                 [ Parser.token "/replies/"
                 , Parser.token "https://glowfic.com/replies/"
+                , Parser.token "https://www.glowfic.com/replies/"
                 ]
             |= Parser.int
             |. Parser.token "#reply-"
@@ -710,6 +707,7 @@ targetParser from =
             |. Parser.oneOf
                 [ Parser.token "/posts/"
                 , Parser.token "https://glowfic.com/posts/"
+                , Parser.token "https://www.glowfic.com/posts/"
                 ]
             |= Parser.int
         , Parser.succeed Nothing
@@ -717,6 +715,7 @@ targetParser from =
                 [ Parser.token "https://en.wikipedia.org/"
                 , Parser.token "https://www.aonprd.com/"
                 , Parser.token "https://www.d20pfsrd.com/"
+                , Parser.token "http://www.chinese-poems.com/"
                 , Parser.token "https://www.willowandroxas.com/"
                 ]
             |. Parser.chompWhile (\_ -> True)
