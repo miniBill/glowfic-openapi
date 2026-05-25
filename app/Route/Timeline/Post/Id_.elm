@@ -397,6 +397,7 @@ viewAnnotation characters annotation =
         characterSelect : (Id CharacterId -> Annotation) -> Html Annotation
         characterSelect ctor =
             let
+                options : List ( String, Annotation )
                 options =
                     characters
                         |> SeqDict.toList
@@ -406,8 +407,18 @@ viewAnnotation characters annotation =
                                 , ctor id
                                 )
                             )
+
+                otherOption : ( String, Annotation )
+                otherOption =
+                    ( "Other"
+                    , if SeqDict.member characterId characters then
+                        ctor (Id.unsafe 0)
+
+                      else
+                        ctor characterId
+                    )
             in
-            select (options ++ [ ( "Other", ctor characterId ) ]) annotation
+            select (options ++ [ otherOption ]) annotation
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
