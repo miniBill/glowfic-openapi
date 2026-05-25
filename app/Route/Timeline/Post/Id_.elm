@@ -379,13 +379,21 @@ viewAnnotations attrs model characters messageCharacter state messageId =
                 ]
                 [ Html.text "➕" ]
 
+        newAnnotation : Annotation
         newAnnotation =
-            Enter
-                (messageCharacter
-                    |> Maybe.map .id
-                    |> Maybe.withDefault
-                        (Id.unsafe 0)
-                )
+            let
+                characterId : Id CharacterId
+                characterId =
+                    messageCharacter
+                        |> Maybe.map .id
+                        |> Maybe.withDefault
+                            (Id.unsafe 0)
+            in
+            if SeqSet.member characterId state.onStage then
+                Exit characterId
+
+            else
+                Enter characterId
 
         annotationViews : List (Html Msg)
         annotationViews =
