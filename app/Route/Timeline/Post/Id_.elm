@@ -239,12 +239,71 @@ view app _ model =
     }
 
 
+type alias State =
+    { onStage : SeqSet (Id CharacterId) }
+
+
+applyAnnotations : List Annotation -> State -> State
+applyAnnotations annotations state =
+    List.foldl
+        (\annotation s ->
+            case annotation of
+                Enter i ->
+                    { s | onStage = SeqSet.insert i s.onStage }
+
+                Exit i ->
+                    { s | onStage = SeqSet.remove i s.onStage }
+
+                HappensBefore _ ->
+                    s
+
+                HappensAfter _ ->
+                    s
+        )
+        state
+        annotations
+
+
 viewThread : Model -> ( PostDetails, List Reply ) -> Html Msg
 viewThread model ( post, replies ) =
     let
         characters : SeqDict (Id CharacterId) (SeqSet String)
         characters =
             Glowfic.Utils.allCharactersIds ( post, replies )
+
+        afterTopPost =
+            case SeqDict.get (MessageIdPost post.id) model.annotations of
+                Nothing ->
+                    { onStage = SeqSet.empty }
+
+                Just annotations ->
+                    applyAnnotations annotations
+                        { onStage = SeqSet.empty }
+
+        ( finalState, messageData ) =
+            List.foldl
+                (\reply ( state, acc ) ->
+                    let
+                        newState : State
+                        newState =
+                            case SeqDict.get (MessageIdReply reply.id) model.annotations of
+                                Nothing ->
+                                    state
+
+                                Just annotations ->
+                                    applyAnnotations annotations state
+                    in
+                    ( newState, newState :: acc )
+                )
+                ( afterTopPost, [] )
+                replies
+                |> Tuple.mapSecond List.reverse
+
+        viewReply : Reply -> State -> List (Html Msg)
+        viewReply reply state =
+            [ View.Post.viewReply [] reply
+            , viewAnnotations [] model characters reply.character state (MessageIdReply reply.id)
+            ]
     in
     Html.div
         [ Html.Attributes.class "thread"
@@ -257,14 +316,41 @@ viewThread model ( post, replies ) =
         ]
         (View.Post.viewHeader [ Html.Attributes.style "grid-column" "1 / span 2" ] post
             :: View.Post.viewTopPost [] post
-            :: viewAnnotations [] model characters post.character (MessageIdPost post.id)
-            :: List.concatMap
-                (\reply ->
-                    [ View.Post.viewReply [] reply
-                    , viewAnnotations [] model characters reply.character (MessageIdReply reply.id)
+            :: viewAnnotations [] model characters post.character afterTopPost (MessageIdPost post.id)
+            :: List.concat (List.map2 viewReply replies messageData)
+            ++ (if post.status == GlowficApi.Types.Status__Complete then
+                    [ Html.div
+                        [ Html.Attributes.style "grid-column" "1 / span 2" ]
+                        [ Html.text "Complete" ]
                     ]
-                )
-                replies
+
+                else
+                    []
+               )
+            ++ (if SeqSet.isEmpty finalState.onStage then
+                    []
+
+                else
+                    let
+                        idToCharacterName : Id CharacterId -> String
+                        idToCharacterName id =
+                            SeqDict.get id characters
+                                |> Maybe.withDefault (SeqSet.singleton ("??? " ++ Id.toString id))
+                                |> SeqSet.toList
+                                |> String.join ", "
+
+                        finalCharacters =
+                            finalState.onStage
+                                |> SeqSet.toList
+                                |> List.map idToCharacterName
+                                |> String.join ", "
+                    in
+                    [ Html.div
+                        [ Html.Attributes.style "grid-column" "1 / span 2" ]
+                        [ Html.text ("On stage at the end: " ++ finalCharacters)
+                        ]
+                    ]
+               )
         )
 
 
@@ -273,9 +359,10 @@ viewAnnotations :
     -> Model
     -> SeqDict (Id CharacterId) (SeqSet String)
     -> Maybe Character
+    -> State
     -> MessageId
     -> Html Msg
-viewAnnotations attrs model characters messageCharacter messageId =
+viewAnnotations attrs model characters messageCharacter state messageId =
     let
         annotations : List Annotation
         annotations =
@@ -321,8 +408,24 @@ viewAnnotations attrs model characters messageCharacter messageId =
                                 [ Html.text "🗑️" ]
                             ]
                     )
+
+        warnings =
+            case messageCharacter of
+                Just character ->
+                    if SeqSet.member character.id state.onStage || List.member (Exit character.id) annotations then
+                        Html.text ""
+
+                    else
+                        Html.span
+                            [ Html.Attributes.style "color" "red"
+                            , Html.Attributes.style "font-weight" "bold"
+                            ]
+                            [ Html.text "Character missing Enter annotation" ]
+
+                Nothing ->
+                    Html.text ""
     in
-    (annotationViews ++ [ addButton ])
+    (annotationViews ++ [ addButton, warnings ])
         |> Html.div
             (Html.Attributes.style "display" "flex"
                 :: Html.Attributes.style "flex-direction" "column"
