@@ -9,7 +9,7 @@ import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import Glowfic.Utils
 import GlowficApi.Extra
-import GlowficApi.Types exposing (PostDetails, Reply)
+import GlowficApi.Types exposing (Character, PostDetails, Reply)
 import Head
 import Head.Seo as Seo
 import Html exposing (Attribute, Html)
@@ -257,42 +257,80 @@ viewThread model ( post, replies ) =
         ]
         (View.Post.viewHeader [ Html.Attributes.style "grid-column" "1 / span 2" ] post
             :: View.Post.viewTopPost [] post
-            :: viewAnnotations [] model characters (MessageIdPost post.id)
+            :: viewAnnotations [] model characters post.character (MessageIdPost post.id)
             :: List.concatMap
                 (\reply ->
                     [ View.Post.viewReply [] reply
-                    , viewAnnotations [] model characters (MessageIdReply reply.id)
+                    , viewAnnotations [] model characters reply.character (MessageIdReply reply.id)
                     ]
                 )
                 replies
         )
 
 
-viewAnnotations : List (Attribute Msg) -> Model -> SeqDict (Id CharacterId) (SeqSet String) -> MessageId -> Html Msg
-viewAnnotations attrs model characters messageId =
+viewAnnotations :
+    List (Attribute Msg)
+    -> Model
+    -> SeqDict (Id CharacterId) (SeqSet String)
+    -> Maybe Character
+    -> MessageId
+    -> Html Msg
+viewAnnotations attrs model characters messageCharacter messageId =
     let
         annotations : List Annotation
         annotations =
             SeqDict.get messageId model.annotations
                 |> Maybe.withDefault []
 
-        addButton : Html (List Annotation)
+        addButton : Html Msg
         addButton =
             Html.button
-                [ Html.Events.onClick (annotations ++ [ Enter (Id.unsafe 0) ])
+                [ Html.Events.onClick
+                    (AnnotationsChanged messageId
+                        (annotations ++ [ newAnnotation ])
+                    )
                 ]
                 [ Html.text "➕" ]
+
+        newAnnotation =
+            Enter
+                (messageCharacter
+                    |> Maybe.map .id
+                    |> Maybe.withDefault
+                        (Id.unsafe 0)
+                )
+
+        annotationViews : List (Html Msg)
+        annotationViews =
+            annotations
+                |> List.indexedMap
+                    (\i annotation ->
+                        Html.div
+                            [ Html.Attributes.style "display" "flex"
+                            , Html.Attributes.style "gap" "4px"
+                            ]
+                            [ Html.button [] [ Html.text "⬆️" ]
+                            , viewAnnotation characters annotation
+                                |> Html.map
+                                    (\changedAnnotation ->
+                                        AnnotationsChanged messageId (List.Extra.setAt i changedAnnotation annotations)
+                                    )
+                            , Html.button [] [ Html.text "⬇️" ]
+                            , Html.button
+                                [ Html.Events.onClick
+                                    (AnnotationsChanged messageId (List.Extra.removeAt i annotations))
+                                ]
+                                [ Html.text "🗑️" ]
+                            ]
+                    )
     in
-    (List.indexedMap
-        (\i annotation ->
-            viewAnnotation characters annotation
-                |> Html.map (\newAnnotation -> List.Extra.setAt i newAnnotation annotations)
-        )
-        annotations
-        ++ [ addButton ]
-    )
-        |> List.map (Html.map (AnnotationsChanged messageId))
-        |> Html.div attrs
+    (annotationViews ++ [ addButton ])
+        |> Html.div
+            (Html.Attributes.style "display" "flex"
+                :: Html.Attributes.style "flex-direction" "column"
+                :: Html.Attributes.style "gap" "4px"
+                :: attrs
+            )
 
 
 viewAnnotation : SeqDict (Id CharacterId) (SeqSet String) -> Annotation -> Html Annotation
@@ -353,8 +391,8 @@ viewAnnotation characters annotation =
 
         selectOptions : List ( String, Annotation )
         selectOptions =
-            [ ( "Enter id", Enter characterId )
-            , ( "Exit id", Exit characterId )
+            [ ( "Enter", Enter characterId )
+            , ( "Exit", Exit characterId )
             , ( "Happens before post", HappensBefore (MessageIdPost postId) )
             , ( "Happens before reply", HappensBefore (MessageIdReply replyId) )
             , ( "Happens after post", HappensAfter (MessageIdPost postId) )
@@ -407,6 +445,7 @@ viewAnnotation characters annotation =
                                 , ctor id
                                 )
                             )
+                        |> List.sortBy Tuple.first
 
                 otherOption : ( String, Annotation )
                 otherOption =
