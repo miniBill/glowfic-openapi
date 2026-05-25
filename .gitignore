@@ -5,4 +5,4 @@ generated
 dist
 functions
 .envrc
-.cache
+data
