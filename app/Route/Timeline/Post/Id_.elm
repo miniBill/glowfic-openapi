@@ -232,7 +232,7 @@ view app _ model =
             [ Html.Events.onClick (PagesMsg.fromMsg SaveAnnotations)
             , Html.Attributes.style "position" "fixed"
             , Html.Attributes.style "bottom" "18px"
-            , Html.Attributes.style "left" "18px"
+            , Html.Attributes.style "left" "218px"
             ]
             [ Html.text "Save annotations" ]
         ]
@@ -339,15 +339,20 @@ viewThread model ( post, replies ) =
                                 |> SeqSet.toList
                                 |> String.join ", "
 
+                        finalCharacters : List String
                         finalCharacters =
                             finalState.onStage
                                 |> SeqSet.toList
                                 |> List.map idToCharacterName
-                                |> String.join ", "
                     in
                     [ Html.div
                         [ Html.Attributes.style "grid-column" "1 / span 2" ]
-                        [ Html.text ("On stage at the end: " ++ finalCharacters)
+                        [ Html.text "On stage at the end:"
+                        , Html.ul []
+                            (List.map
+                                (\character -> Html.li [] [ Html.text character ])
+                                finalCharacters
+                            )
                         ]
                     ]
                )
