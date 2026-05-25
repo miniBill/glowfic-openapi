@@ -309,13 +309,11 @@ viewAnnotations attrs model characters messageCharacter messageId =
                             [ Html.Attributes.style "display" "flex"
                             , Html.Attributes.style "gap" "4px"
                             ]
-                            [ Html.button [] [ Html.text "⬆️" ]
-                            , viewAnnotation characters annotation
+                            [ viewAnnotation characters annotation
                                 |> Html.map
                                     (\changedAnnotation ->
                                         AnnotationsChanged messageId (List.Extra.setAt i changedAnnotation annotations)
                                     )
-                            , Html.button [] [ Html.text "⬇️" ]
                             , Html.button
                                 [ Html.Events.onClick
                                     (AnnotationsChanged messageId (List.Extra.removeAt i annotations))
