@@ -2,6 +2,7 @@ module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, M
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
+import BackendTask.File as File
 import Color.Oklch as Oklch exposing (Oklch)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
@@ -39,7 +40,7 @@ type alias ActionData =
 
 type alias Data =
     { name : String
-    , posts : SeqDict (Id PostId) ( PostDetails, List Reply )
+    , posts : SeqDict (Id PostId) { post : ( PostDetails, List Reply ), hasAnnotations : Bool }
     , characters :
         SeqDict
             (Id CharacterId)
@@ -122,12 +123,18 @@ monad params =
     <| \continuityId ->
     Do.do (GlowficApi.Extra.getBoard continuityId) <| \board ->
     Do.do (GlowficApi.Extra.getAllBoardsIdPosts continuityId) <| \results ->
-    Do.eachCount results (\post -> GlowficApi.Extra.getPost post.id) <| \posts ->
+    Do.eachCount results
+        (\post ->
+            Monad.map2 Tuple.pair
+                (GlowficApi.Extra.getPost post.id)
+                (Monad.lift (File.exists (Glowfic.Utils.annotationsFilepath post.id)))
+        )
+    <| \posts ->
     let
         frequency : SeqDict (Id CharacterId) Int
         frequency =
             posts
-                |> List.map (\post -> Glowfic.Utils.allCharactersIds post |> SeqDict.map (\_ _ -> 1))
+                |> List.map (\( post, _ ) -> Glowfic.Utils.allCharactersIds post |> SeqDict.map (\_ _ -> 1))
                 |> List.foldl
                     (\e a ->
                         SeqDict.merge
@@ -163,8 +170,8 @@ monad params =
             , posts =
                 posts
                     |> List.map
-                        (\( p, r ) ->
-                            ( Id.for p, ( p, r ) )
+                        (\( ( p, r ), ann ) ->
+                            ( Id.for p, { post = ( p, r ), hasAnnotations = ann } )
                         )
                     |> SeqDict.fromList
             , name = board.name
@@ -255,8 +262,8 @@ view app _ =
             [ app.data.posts
                 |> SeqDict.values
                 |> List.concatMap
-                    (\( post, replies ) ->
-                        viewPostCharacters app.data post replies
+                    (\{ post } ->
+                        viewPostCharacters app.data post
                     )
                 |> (++) (viewPostTitles app.data)
                 |> (++) (viewCharacterNames app.data)
@@ -350,7 +357,15 @@ viewPostTitles appData =
     appData.posts
         |> SeqDict.values
         |> List.map
-            (\( post, _ ) ->
+            (\postData ->
+                let
+                    ( post, _ ) =
+                        postData.post
+
+                    cutTitle : String
+                    cutTitle =
+                        String.Extra.ellipsis 40 post.subject
+                in
                 Route.link
                     [ Html.Attributes.style "display" "block"
                     , Html.Attributes.style "grid-row-start" "post-name-start"
@@ -358,7 +373,11 @@ viewPostTitles appData =
                     , Html.Attributes.style "writing-mode" "vertical-rl"
                     , Html.Attributes.style "text-orientation" "mixed"
                     ]
-                    [ Html.text (String.Extra.ellipsis 55 post.subject)
+                    [ if postData.hasAnnotations then
+                        Html.text cutTitle
+
+                      else
+                        Html.text ("⚠️ " ++ cutTitle)
                     ]
                     (Route.Timeline__Post__Id_ { id = Id.toString post.id })
             )
@@ -457,8 +476,8 @@ viewPostTitles appData =
 --                 ]
 
 
-viewPostCharacters : Data -> PostDetails -> List Reply -> List (Html msg)
-viewPostCharacters appData post replies =
+viewPostCharacters : Data -> ( PostDetails, List Reply ) -> List (Html msg)
+viewPostCharacters appData ( post, replies ) =
     let
         charactersIds : SeqDict (Id CharacterId) (SeqSet String)
         charactersIds =

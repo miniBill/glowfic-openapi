@@ -1,4 +1,4 @@
-module Monad exposing (Monad, andThen, combine, fail, failString, getRefreshingIf, lift, log, map, run, succeed)
+module Monad exposing (Monad, andThen, combine, fail, failString, getRefreshingIf, lift, log, map, map2, run, succeed)
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
@@ -48,6 +48,23 @@ map f (Monad x) =
                     (\( y, mid ) ->
                         ( f y, mid )
                     )
+        )
+
+
+map2 : (a -> b -> c) -> Monad a -> Monad b -> Monad c
+map2 f (Monad a) (Monad b) =
+    Monad
+        (\init ->
+            BackendTask.map2
+                (\( av, amid ) ( bv, bmid ) ->
+                    ( f av bv
+                    , { token = amid.token
+                      , got429 = amid.got429 || bmid.got429
+                      }
+                    )
+                )
+                (a init)
+                (b init)
         )
 
 
