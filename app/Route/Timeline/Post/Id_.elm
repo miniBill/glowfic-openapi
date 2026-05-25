@@ -2,6 +2,8 @@ module Route.Timeline.Post.Id_ exposing (ActionData, Data, Model, Msg, RoutePara
 
 import Annotation exposing (Annotation(..), MessageId(..))
 import BackendTask exposing (BackendTask)
+import BackendTask.File as File
+import Codec exposing (Codec)
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
@@ -15,6 +17,8 @@ import Html.Attributes
 import Html.Events
 import Html.Parser
 import Id exposing (CharacterId, Id, PostId, ReplyId)
+import Json.Decode
+import Json.Encode
 import List.Extra
 import Maybe.Extra
 import Monad exposing (Monad)
@@ -51,6 +55,7 @@ type alias Model =
 
 type Msg
     = AnnotationsChanged MessageId (List Annotation)
+    | SaveAnnotations
 
 
 type alias RouteParams =
@@ -90,6 +95,32 @@ update app _ msg model =
 
         AnnotationsChanged id newAnnotations ->
             ( { model | annotations = SeqDict.insert id newAnnotations model.annotations }, Effect.none )
+
+        SaveAnnotations ->
+            let
+                postId : Id PostId
+                postId =
+                    (Tuple.first app.data.post).id
+            in
+            ( model
+            , Effect.saveFile
+                { filename = filenameForAnnotations postId
+                , mime = "application/json"
+                , content = Codec.encodeToString 2 annotationsCodec model.annotations
+                }
+            )
+
+
+filenameForAnnotations : Id PostId -> String
+filenameForAnnotations postId =
+    "annotations-" ++ Id.toString postId ++ ".json"
+
+
+annotationsCodec : Codec (SeqDict MessageId (List Annotation))
+annotationsCodec =
+    Codec.tuple Annotation.messageIdCodec (Codec.list Annotation.codec)
+        |> Codec.list
+        |> Codec.map SeqDict.fromList SeqDict.toList
 
 
 head : App Data ActionData RouteParams -> List Head.Tag
@@ -133,7 +164,19 @@ monad params =
         )
     <| \postId ->
     Do.do (GlowficApi.Extra.getPost postId) <| \post ->
-    Do.do (calculatePostAnnotations post) <| \annotations ->
+    Do.do
+        (Monad.lift (readAnnotationsFromFile postId)
+            |> Monad.andThen
+                (\e ->
+                    case e of
+                        Nothing ->
+                            calculatePostAnnotations post
+
+                        Just o ->
+                            Monad.succeed o
+                )
+        )
+    <| \annotations ->
     let
         result : Data
         result =
@@ -148,10 +191,51 @@ monad params =
     Monad.succeed (Response.render result)
 
 
+readAnnotationsFromFile : Id PostId -> BackendTask FatalError (Maybe (List ( MessageId, Annotation )))
+readAnnotationsFromFile postId =
+    File.rawFile ("data/" ++ filenameForAnnotations postId)
+        |> BackendTask.toResult
+        |> BackendTask.andThen
+            (\raw ->
+                case raw of
+                    Err e ->
+                        case e.recoverable of
+                            File.FileDoesntExist ->
+                                BackendTask.succeed Nothing
+
+                            _ ->
+                                BackendTask.fail e.fatal
+
+                    Ok rawString ->
+                        case Codec.decodeString annotationsCodec rawString of
+                            Ok v ->
+                                v
+                                    |> SeqDict.toList
+                                    |> List.concatMap
+                                        (\( messageId, annotations ) ->
+                                            List.map (Tuple.pair messageId) annotations
+                                        )
+                                    |> Just
+                                    |> BackendTask.succeed
+
+                            Err e ->
+                                BackendTask.fail (FatalError.fromString (Json.Decode.errorToString e))
+            )
+
+
 view : App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg Msg)
 view app _ model =
     { title = (Tuple.first app.data.post).subject
-    , body = [ Html.map PagesMsg.fromMsg (viewThread model app.data.post) ]
+    , body =
+        [ Html.map PagesMsg.fromMsg (viewThread model app.data.post)
+        , Html.button
+            [ Html.Events.onClick (PagesMsg.fromMsg SaveAnnotations)
+            , Html.Attributes.style "position" "fixed"
+            , Html.Attributes.style "bottom" "18px"
+            , Html.Attributes.style "left" "18px"
+            ]
+            [ Html.text "Save annotations" ]
+        ]
     }
 
 

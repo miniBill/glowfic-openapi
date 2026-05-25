@@ -1,9 +1,12 @@
-module Effect exposing (Effect, batch, fromCmd, map, none, perform)
+module Effect exposing (Effect, batch, fromCmd, map, none, perform, saveFile)
+
+import File.Download
 
 
 type Effect msg
     = Batch (List (Effect msg))
     | Cmd (Cmd msg)
+    | SaveFile { filename : String, mime : String, content : String }
 
 
 none : Effect msg
@@ -27,6 +30,9 @@ map f effect =
         Batch children ->
             Batch (List.map (map f) children)
 
+        SaveFile data ->
+            SaveFile data
+
         Cmd cmd ->
             Cmd (Cmd.map f cmd)
 
@@ -39,3 +45,11 @@ perform cfg effect =
 
         Batch effects ->
             Cmd.batch (List.map (perform cfg) effects)
+
+        SaveFile data ->
+            File.Download.string data.filename data.mime data.content
+
+
+saveFile : { filename : String, mime : String, content : String } -> Effect msg
+saveFile data =
+    SaveFile data

@@ -1,6 +1,7 @@
 module Id exposing
     ( Id, for, toInt, toString, unsafe
     , AliasId, BoardId, BookmarkId, CharacterId, GalleryId, IconId, PostId, ReplyId, SectionId, TagId, TemplateId, UserId
+    , codec
     )
 
 {-|
@@ -9,6 +10,8 @@ module Id exposing
 @docs AliasId, BoardId, BookmarkId, CharacterId, GalleryId, IconId, PostId, ReplyId, SectionId, TagId, TemplateId, UserId
 
 -}
+
+import Codec exposing (Codec)
 
 
 type Id t
@@ -81,3 +84,8 @@ for t =
 toString : Id t -> String
 toString (Id i) =
     String.fromInt i
+
+
+codec : Codec (Id t)
+codec =
+    Codec.map unsafe toInt Codec.int
