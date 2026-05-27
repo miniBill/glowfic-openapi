@@ -8,7 +8,7 @@ import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import Glowfic.Utils
 import GlowficApi.Extra
-import GlowficApi.Types exposing (PostDetails, Reply)
+import GlowficApi.Types exposing (PostDetails, Reply, Status(..))
 import GlowficRoute
 import Head
 import Head.Seo as Seo
@@ -373,11 +373,22 @@ viewPostTitles appData =
                     , Html.Attributes.style "writing-mode" "vertical-rl"
                     , Html.Attributes.style "text-orientation" "mixed"
                     ]
-                    [ if postData.hasAnnotations then
-                        Html.text cutTitle
+                    [ [ if postData.hasAnnotations then
+                            ""
 
-                      else
-                        Html.text ("⚠️ " ++ cutTitle)
+                        else
+                            "⚠️"
+                      , case post.status of
+                            Status__Complete ->
+                                "✅"
+
+                            Status__Active ->
+                                "✍️"
+                      , cutTitle
+                      ]
+                        |> List.Extra.removeWhen String.isEmpty
+                        |> String.join " "
+                        |> Html.text
                     ]
                     (Route.Timeline__Post__Id_ { id = Id.toString post.id })
             )
