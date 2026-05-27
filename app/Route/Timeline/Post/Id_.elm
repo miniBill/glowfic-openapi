@@ -34,6 +34,7 @@ import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
 import Shared
+import String.Extra
 import UrlPath exposing (UrlPath)
 import View exposing (View)
 import View.Post
@@ -330,9 +331,16 @@ viewThread model ( post, replies ) =
                         idToCharacterName : Id CharacterId -> String
                         idToCharacterName id =
                             SeqDict.get id characters
-                                |> Maybe.withDefault (SeqSet.singleton ("??? " ++ Id.toString id))
-                                |> SeqSet.toList
-                                |> String.join ", "
+                                |> Maybe.andThen
+                                    (\l ->
+                                        l
+                                            |> SeqSet.toList
+                                            |> List.map String.trim
+                                            |> List.Extra.removeWhen String.isEmpty
+                                            |> String.join ", "
+                                            |> String.Extra.nonEmpty
+                                    )
+                                |> Maybe.withDefault ("??? " ++ Id.toString id)
 
                         finalCharacters : List String
                         finalCharacters =
