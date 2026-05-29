@@ -17,8 +17,9 @@ import GlowficApi.Types exposing (PostDetails, PostSummary, Reply, Status(..))
 import GlowficRoute
 import Head
 import Head.Seo as Seo
-import Html exposing (Html)
+import Html exposing (Attribute, Html)
 import Html.Attributes
+import Html.Events.Extra.Pointer as Pointer
 import Html.Parser
 import Id exposing (BoardId, CharacterId, IconId, Id, PostId)
 import List.Extra
@@ -27,6 +28,7 @@ import Monad exposing (Monad)
 import Monad.Do as Do
 import OpenApi.Common
 import Pages.Url
+import PagesMsg
 import Pixels exposing (Pixels)
 import Point2d exposing (Point2d)
 import Quantity exposing (Quantity)
@@ -43,6 +45,7 @@ import TypedSvg.Attributes
 import TypedSvg.Attributes.InPixels
 import TypedSvg.Attributes.InPx
 import TypedSvg.Core
+import TypedSvg.Events
 import TypedSvg.Types exposing (AlignmentBaseline(..), AnchorAlignment(..), DominantBaseline(..), LengthAdjust(..), Paint(..))
 import Url exposing (Url)
 import UrlPath
@@ -93,8 +96,8 @@ type MouseState
 
 
 type Msg
-    = MouseDown (Id PostId) (Point2d Pixels ElementCoordinates)
-    | MouseMove (Point2d Pixels ElementCoordinates)
+    = MouseDown (Id PostId) Pointer.Event
+    | MouseMove Pointer.Event
     | MouseUp
 
 
@@ -117,7 +120,7 @@ route =
             { init = init
             , update = update
             , subscriptions = subscriptions
-            , view = view
+            , view = \app shared model -> view app shared model |> View.map PagesMsg.fromMsg
             }
 
 
@@ -133,10 +136,22 @@ init app model =
 update : App Data ActionData RouteParams -> Shared.Model -> Msg -> Model -> ( Model, Effect msg )
 update arg1 arg2 msg model =
     case msg of
-        MouseDown postId position ->
+        MouseDown postId event ->
+            let
+                position : Point2d Pixels ElementCoordinates
+                position =
+                    event.pointer.offsetPos
+                        |> Point2d.fromTuple Pixels.pixels
+            in
             ( { model | mouseState = MouseDragging postId position position }, Effect.none )
 
-        MouseMove position ->
+        MouseMove event ->
+            let
+                position : Point2d Pixels ElementCoordinates
+                position =
+                    event.pointer.offsetPos
+                        |> Point2d.fromTuple Pixels.pixels
+            in
             ( case model.mouseState of
                 MouseNotDragging ->
                     model
@@ -431,7 +446,7 @@ getCharacter id color =
             )
 
 
-view : App Data ActionData RouteParams -> Shared.Model -> Model -> View msg
+view : App Data ActionData RouteParams -> Shared.Model -> Model -> View Msg
 view app _ model =
     { title = app.data.name
     , body =
@@ -483,7 +498,7 @@ view app _ model =
     }
 
 
-viewPost : ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> List (Html msg)
+viewPost : ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> List (Html Msg)
 viewPost ( d, boundingBox ) =
     let
         ( post, _ ) =
@@ -495,28 +510,39 @@ viewPost ( d, boundingBox ) =
         id : String
         id =
             "p" ++ Id.toString post.id
+
+        clickAttrs : List (Attribute Msg)
+        clickAttrs =
+            [ Pointer.onDown (MouseDown post.id)
+            , Pointer.onMove MouseMove
+            , Pointer.onUp (always MouseUp)
+            ]
     in
     [ TypedSvg.rect
-        [ TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
-        , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
-        , TypedSvg.Attributes.InPixels.width w
-        , TypedSvg.Attributes.InPixels.height h
-        , TypedSvg.Attributes.id id
-        ]
+        ([ TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
+         , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
+         , TypedSvg.Attributes.InPixels.width w
+         , TypedSvg.Attributes.InPixels.height h
+         , TypedSvg.Attributes.id id
+         ]
+            ++ clickAttrs
+        )
         []
     , TypedSvg.text_
-        [ TypedSvg.Attributes.dominantBaseline DominantBaselineHanging
-        , TypedSvg.Attributes.fill (Paint Color.white)
+        ([ TypedSvg.Attributes.dominantBaseline DominantBaselineHanging
+         , TypedSvg.Attributes.fill (Paint Color.white)
 
-        -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
-        -- , TypedSvg.Core.attribute "shape-padding" "8px"
-        , TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
-        , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
+         -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
+         -- , TypedSvg.Core.attribute "shape-padding" "8px"
+         , TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
+         , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
 
-        -- , TypedSvg.Attributes.textAnchor AnchorMiddle
-        , TypedSvg.Attributes.InPixels.textLength w
-        , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
-        ]
+         -- , TypedSvg.Attributes.textAnchor AnchorMiddle
+         , TypedSvg.Attributes.InPixels.textLength w
+         , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
+         ]
+            ++ clickAttrs
+        )
         [ TypedSvg.Core.text post.subject ]
     ]
 

@@ -37,6 +37,7 @@
             "miniBill/elm-oklch": "1.1.0",
             "miniBill/elm-parser-error-extra": "1.0.0",
             "miniBill/elm-rope": "1.1.1",
+            "mpizenberg/elm-pointer-events": "5.0.0",
             "wolfadex/elm-ansi": "3.0.1",
             "wolfadex/elm-rfc3339": "2.0.0"
         },
