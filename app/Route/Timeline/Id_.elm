@@ -372,6 +372,7 @@ viewPostTitles appData =
                     , Html.Attributes.style "grid-column-start" ("p" ++ Id.toString post.id ++ "-start")
                     , Html.Attributes.style "writing-mode" "vertical-rl"
                     , Html.Attributes.style "text-orientation" "mixed"
+                    , Html.Attributes.style "align-self" "start"
                     ]
                     [ [ case post.status of
                             Status__Complete ->
