@@ -24,3 +24,8 @@ width v =
 height : Quantity Float Pixels -> Attribute msg
 height v =
     TypedSvg.Attributes.InPx.height (Pixels.inPixels v)
+
+
+textLength : Quantity Float Pixels -> Attribute msg
+textLength v =
+    TypedSvg.Attributes.InPx.textLength (Pixels.inPixels v)

@@ -5,6 +5,7 @@ import BackendTask exposing (BackendTask)
 import BackendTask.File as File
 import BoundingBox2d exposing (BoundingBox2d)
 import Codec exposing (Codec)
+import Color
 import Color.Oklch as Oklch exposing (Oklch)
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
@@ -41,6 +42,8 @@ import TypedSvg
 import TypedSvg.Attributes
 import TypedSvg.Attributes.InPixels
 import TypedSvg.Attributes.InPx
+import TypedSvg.Core
+import TypedSvg.Types exposing (AlignmentBaseline(..), AnchorAlignment(..), DominantBaseline(..), LengthAdjust(..), Paint(..))
 import Url exposing (Url)
 import UrlPath
 import Vector2d exposing (Vector2d)
@@ -457,8 +460,8 @@ view app _ model =
                     , BoundingBox2d.fromExtrema
                         { minX = Quantity.zero
                         , minY = Quantity.zero
-                        , maxX = Pixels.pixels 10
-                        , maxY = Pixels.pixels 10
+                        , maxX = Pixels.pixels 100
+                        , maxY = Pixels.pixels 100
                         }
                     )
                         :: acc
@@ -468,11 +471,11 @@ view app _ model =
                 app.data.posts
                 model.positions
                 []
-                |> List.map viewPost
+                |> List.concatMap viewPost
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
                     , Html.Attributes.style "max-width" "100vw"
-                    , TypedSvg.Attributes.viewBox 0 0 100 100
+                    , TypedSvg.Attributes.viewBox 0 0 800 800
                     ]
             , viewCharacters app.data.characters
             ]
@@ -480,19 +483,42 @@ view app _ model =
     }
 
 
-viewPost : ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> Html msg
-viewPost ( { post }, boundingBox ) =
+viewPost : ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> List (Html msg)
+viewPost ( d, boundingBox ) =
     let
+        ( post, _ ) =
+            d.post
+
         ( w, h ) =
             BoundingBox2d.dimensions boundingBox
+
+        id : String
+        id =
+            "p" ++ Id.toString post.id
     in
-    TypedSvg.rect
+    [ TypedSvg.rect
         [ TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
         , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
         , TypedSvg.Attributes.InPixels.width w
         , TypedSvg.Attributes.InPixels.height h
+        , TypedSvg.Attributes.id id
         ]
         []
+    , TypedSvg.text_
+        [ TypedSvg.Attributes.dominantBaseline DominantBaselineHanging
+        , TypedSvg.Attributes.fill (Paint Color.white)
+
+        -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
+        -- , TypedSvg.Core.attribute "shape-padding" "8px"
+        , TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
+        , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
+
+        -- , TypedSvg.Attributes.textAnchor AnchorMiddle
+        , TypedSvg.Attributes.InPixels.textLength w
+        , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
+        ]
+        [ TypedSvg.Core.text post.subject ]
+    ]
 
 
 viewCharacters : SeqDict (Id CharacterId) CharacterSummary -> Html msg
