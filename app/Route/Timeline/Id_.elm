@@ -32,6 +32,9 @@ import SeqDict.Extra
 import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
 import String.Extra
+import TypedSvg
+import TypedSvg.Attributes
+import TypedSvg.Attributes.InPx
 import Url exposing (Url)
 import UrlPath
 import View exposing (View)
@@ -337,31 +340,32 @@ view app _ =
             , Html.Attributes.style "color" "#f3f3f3"
             , Html.Attributes.style "background" "#211e2f"
             , Html.Attributes.style "gap" "8px"
+            , Html.Attributes.style "padding" "8px"
+            , Html.Attributes.style "align-items" "start"
             ]
             [ app.data.posts
                 |> SeqDict.values
-                |> List.concatMap
-                    (\{ post } ->
-                        viewPostCharacters app.data post
-                    )
-                |> (++) (viewPostTitles app.data)
-                |> (++) (viewCharacterNames app.data)
-                |> Html.div
-                    [ Html.Attributes.style "display" "grid"
-                    , Html.Attributes.style "flex" "1"
-                    , Html.Attributes.style "gap" "8px"
-                    , Html.Attributes.style "padding" "8px"
-                    , Html.Attributes.style "overflow" "scroll"
+                |> List.map viewPost
+                |> TypedSvg.svg
+                    [ Html.Attributes.style "overflow" "scroll"
                     , Html.Attributes.style "max-width" "100vw"
-                    , Html.Attributes.style "grid-template-rows"
-                        (String.join " " ("[post-name-start] auto" :: columns))
-                    , Html.Attributes.style "grid-template-columns"
-                        (String.join " " ("[character-name-start] auto" :: rows))
+                    , TypedSvg.Attributes.viewBox 0 0 100 100
                     ]
             , viewCharacters app.data.characters
             ]
         ]
     }
+
+
+viewPost : { post : ( PostDetails, List Reply ), hasAnnotations : Bool } -> Html msg
+viewPost { post } =
+    TypedSvg.rect
+        [ TypedSvg.Attributes.InPx.x 0
+        , TypedSvg.Attributes.InPx.y 0
+        , TypedSvg.Attributes.InPx.width 10
+        , TypedSvg.Attributes.InPx.height 10
+        ]
+        []
 
 
 viewCharacters : SeqDict (Id CharacterId) CharacterSummary -> Html msg

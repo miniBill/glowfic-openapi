@@ -22,6 +22,7 @@
             "elm/parser": "1.1.0",
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
+            "elm-community/typed-svg": "7.0.0",
             "elmcraft/core-extra": "2.3.0",
             "ianmackenzie/elm-geometry": "4.0.0",
             "ianmackenzie/elm-units": "2.10.0",
