@@ -8,7 +8,7 @@ import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
 import Glowfic.Utils
 import GlowficApi.Extra
-import GlowficApi.Types exposing (PostDetails, Reply, Status(..))
+import GlowficApi.Types exposing (PostDetails, PostSummary, Reply, Status(..))
 import GlowficRoute
 import Head
 import Head.Seo as Seo
@@ -123,7 +123,8 @@ monad params =
     <| \continuityId ->
     Do.do (GlowficApi.Extra.getBoard continuityId) <| \board ->
     Do.do (GlowficApi.Extra.getAllBoardsIdPosts continuityId) <| \results ->
-    Do.eachCount results
+    -- Reverse posts so that 429s hurt us less
+    Do.eachCount (results |> List.reverse |> List.Extra.removeWhen nonCanonical)
         (\post ->
             Monad.map2 Tuple.pair
                 (GlowficApi.Extra.getPost post.id)
@@ -169,6 +170,17 @@ monad params =
                     |> SeqDict.fromList
             , posts =
                 posts
+                    |> List.sortBy
+                        (\( ( p, _ ), _ ) ->
+                            ( case p.section of
+                                OpenApi.Common.Present { id } ->
+                                    Id.toInt id
+
+                                OpenApi.Common.Null ->
+                                    0
+                            , Id.toInt p.id
+                            )
+                        )
                     |> List.map
                         (\( ( p, r ), ann ) ->
                             ( Id.for p, { post = ( p, r ), hasAnnotations = ann } )
@@ -180,6 +192,16 @@ monad params =
     result
         |> Response.render
         |> Monad.succeed
+
+
+nonCanonical : PostSummary -> Bool
+nonCanonical post =
+    case post.section of
+        OpenApi.Common.Present section ->
+            section.name == "Non-Canon"
+
+        OpenApi.Common.Null ->
+            False
 
 
 assignColors : List id -> List ( id, Oklch )

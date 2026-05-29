@@ -1292,6 +1292,18 @@ components:
                         - id
                 section:
                     type: object
+                    properties:
+                        id:
+                            type: integer
+                            format: Id SectionId
+                        name:
+                            type: string
+                        order:
+                            type: integer
+                    required:
+                        - id
+                        - name
+                        - order
                     nullable: true
                 authors:
                     type: array
