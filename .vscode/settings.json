@@ -1,4 +1,5 @@
 {
     "cSpell.words": ["screenname", "Subcontinuities"],
-    "elmLS.elmFormatPath": "elm-format-hack"
+    "elmLS.elmFormatPath": "elm-format-hack",
+    "elmLS.elmPath": "node_modules/.bin/lamdera"
 }
