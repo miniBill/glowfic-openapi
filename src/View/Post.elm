@@ -16,7 +16,10 @@ viewHeader attrs post =
     Html.div attrs
         [ Html.div
             [ Html.Attributes.class "subject" ]
-            [ Html.text post.subject ]
+            [ Html.a
+                [ Html.Attributes.href (GlowficRoute.post post.id) ]
+                [ Html.text post.subject ]
+            ]
         , case post.description of
             OpenApi.Common.Null ->
                 Html.text ""
