@@ -3,6 +3,7 @@ module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, M
 import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.File as File
+import Codec exposing (Codec)
 import Color.Oklch as Oklch exposing (Oklch)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
@@ -22,6 +23,8 @@ import Monad exposing (Monad)
 import Monad.Do as Do
 import OpenApi.Common
 import Pages.Url
+import Pixels exposing (Pixels)
+import Quantity exposing (Quantity)
 import Route
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)
@@ -38,6 +41,14 @@ type alias ActionData =
     Never
 
 
+type alias Position =
+    { minX : Quantity Float Pixels
+    , maxX : Quantity Float Pixels
+    , minY : Quantity Float Pixels
+    , maxY : Quantity Float Pixels
+    }
+
+
 type alias Data =
     { name : String
     , posts : SeqDict (Id PostId) { post : ( PostDetails, List Reply ), hasAnnotations : Bool }
@@ -45,6 +56,7 @@ type alias Data =
         SeqDict
             (Id CharacterId)
             CharacterSummary
+    , positions : SeqDict (Id PostId) Position
     }
 
 
@@ -128,9 +140,10 @@ monad params =
         (\post ->
             Monad.map2 Tuple.pair
                 (GlowficApi.Extra.getPost post.id)
-                (Monad.lift (File.exists (Glowfic.Utils.annotationsFilepath post.id)))
+                (Monad.lift (File.exists (Glowfic.Utils.postAnnotationsFilepath post.id)))
         )
     <| \posts ->
+    Do.do (Monad.lift (positionsData board.id)) <| \positions ->
     let
         frequency : SeqDict (Id CharacterId) Int
         frequency =
@@ -187,11 +200,55 @@ monad params =
                         )
                     |> SeqDict.fromList
             , name = board.name
+            , positions = positions
             }
     in
     result
         |> Response.render
         |> Monad.succeed
+
+
+positionsData : Id BoardId -> BackendTask FatalError (SeqDict (Id PostId) Position)
+positionsData boardId =
+    File.jsonFile (Codec.decoder positionsCodec) (Glowfic.Utils.boardAnnotationsFilepath boardId)
+        |> BackendTask.onError
+            (\e ->
+                case e.recoverable of
+                    File.FileDoesntExist ->
+                        BackendTask.succeed SeqDict.empty
+
+                    _ ->
+                        BackendTask.fail e.fatal
+            )
+
+
+positionsCodec : Codec (SeqDict (Id PostId) Position)
+positionsCodec =
+    Codec.tuple Id.codec boundingBoxCodec
+        |> Codec.list
+        |> Codec.map SeqDict.fromList SeqDict.toList
+
+
+boundingBoxCodec : Codec Position
+boundingBoxCodec =
+    Codec.object
+        (\minX maxX minY maxY ->
+            { minX = minX
+            , maxX = maxX
+            , minY = minY
+            , maxY = maxY
+            }
+        )
+        |> Codec.field "minX" .minX (quantityCodec Codec.float)
+        |> Codec.field "maxX" .maxX (quantityCodec Codec.float)
+        |> Codec.field "minY" .minY (quantityCodec Codec.float)
+        |> Codec.field "maxY" .maxY (quantityCodec Codec.float)
+        |> Codec.buildObject
+
+
+quantityCodec : Codec number -> Codec (Quantity number unit)
+quantityCodec codec =
+    Codec.map Quantity.unsafe Quantity.unwrap codec
 
 
 nonCanonical : PostSummary -> Bool

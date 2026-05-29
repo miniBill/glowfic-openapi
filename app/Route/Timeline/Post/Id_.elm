@@ -105,7 +105,7 @@ update app _ msg model =
             in
             ( model
             , Effect.saveFile
-                { filename = Glowfic.Utils.annotationsFilename postId
+                { filename = Glowfic.Utils.postAnnotationsFilename postId
                 , mime = "application/json"
                 , content = Codec.encodeToString 2 annotationsCodec model.annotations
                 }
@@ -189,7 +189,7 @@ monad params =
 
 readAnnotationsFromFile : Id PostId -> BackendTask FatalError (Maybe (List ( MessageId, Annotation )))
 readAnnotationsFromFile postId =
-    File.rawFile (Glowfic.Utils.annotationsFilepath postId)
+    File.rawFile (Glowfic.Utils.postAnnotationsFilepath postId)
         |> BackendTask.toResult
         |> BackendTask.andThen
             (\raw ->
