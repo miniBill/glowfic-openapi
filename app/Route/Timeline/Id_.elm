@@ -373,12 +373,7 @@ viewPostTitles appData =
                     , Html.Attributes.style "writing-mode" "vertical-rl"
                     , Html.Attributes.style "text-orientation" "mixed"
                     ]
-                    [ [ if postData.hasAnnotations then
-                            ""
-
-                        else
-                            "⚠️"
-                      , case post.status of
+                    [ [ case post.status of
                             Status__Complete ->
                                 "✅"
 
@@ -387,6 +382,11 @@ viewPostTitles appData =
 
                             Status__Abandoned ->
                                 "💀"
+                      , if postData.hasAnnotations then
+                            ""
+
+                        else
+                            "⚠️"
                       , cutTitle
                       ]
                         |> List.Extra.removeWhen String.isEmpty
