@@ -384,6 +384,9 @@ viewPostTitles appData =
 
                             Status__Active ->
                                 "✍️"
+
+                            Status__Abandoned ->
+                                "💀"
                       , cutTitle
                       ]
                         |> List.Extra.removeWhen String.isEmpty
