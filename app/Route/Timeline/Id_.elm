@@ -3,10 +3,13 @@ module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, M
 import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.File as File
+import BoundingBox2d exposing (BoundingBox2d)
 import Codec exposing (Codec)
 import Color.Oklch as Oklch exposing (Oklch)
+import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
+import Frame2d exposing (Frame2d)
 import Glowfic.Utils
 import GlowficApi.Extra
 import GlowficApi.Types exposing (PostDetails, PostSummary, Reply, Status(..))
@@ -24,19 +27,23 @@ import Monad.Do as Do
 import OpenApi.Common
 import Pages.Url
 import Pixels exposing (Pixels)
+import Point2d exposing (Point2d)
 import Quantity exposing (Quantity)
 import Route
-import RouteBuilder exposing (App, StatelessRoute)
+import RouteBuilder exposing (App, StatefulRoute, StatelessRoute)
 import SeqDict exposing (SeqDict)
 import SeqDict.Extra
 import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
+import Shared
 import String.Extra
 import TypedSvg
 import TypedSvg.Attributes
+import TypedSvg.Attributes.InPixels
 import TypedSvg.Attributes.InPx
 import Url exposing (Url)
 import UrlPath
+import Vector2d exposing (Vector2d)
 import View exposing (View)
 
 
@@ -44,23 +51,24 @@ type alias ActionData =
     Never
 
 
-type alias Position =
-    { minX : Quantity Float Pixels
-    , maxX : Quantity Float Pixels
-    , minY : Quantity Float Pixels
-    , maxY : Quantity Float Pixels
-    }
+type WorldCoordinates
+    = WorldCoordinates
+
+
+type ElementCoordinates
+    = ElementCoordinates
 
 
 type alias Data =
     { name : String
     , posts : SeqDict (Id PostId) { post : ( PostDetails, List Reply ), hasAnnotations : Bool }
-    , characters :
-        SeqDict
-            (Id CharacterId)
-            CharacterSummary
-    , positions : SeqDict (Id PostId) Position
+    , characters : SeqDict (Id CharacterId) CharacterSummary
+    , initialPositions : SeqDict (Id PostId) Position
     }
+
+
+type alias Position =
+    BoundingBox2d Pixels WorldCoordinates
 
 
 type alias CharacterSummary =
@@ -71,18 +79,27 @@ type alias CharacterSummary =
 
 
 type alias Model =
-    {}
+    { positions : SeqDict (Id PostId) Position
+    , mouseState : MouseState
+    }
 
 
-type alias Msg =
-    ()
+type MouseState
+    = MouseNotDragging
+    | MouseDragging (Id PostId) (Point2d Pixels ElementCoordinates) (Point2d Pixels ElementCoordinates)
+
+
+type Msg
+    = MouseDown (Id PostId) (Point2d Pixels ElementCoordinates)
+    | MouseMove (Point2d Pixels ElementCoordinates)
+    | MouseUp
 
 
 type alias RouteParams =
     { id : String }
 
 
-route : StatelessRoute RouteParams Data ActionData
+route : StatefulRoute RouteParams Data ActionData Model Msg
 route =
     RouteBuilder.preRenderWithFallback
         { head = head
@@ -93,7 +110,73 @@ route =
                  -- , { id = "4902" }
                 ]
         }
-        |> RouteBuilder.buildNoState { view = view }
+        |> RouteBuilder.buildWithLocalState
+            { init = init
+            , update = update
+            , subscriptions = subscriptions
+            , view = view
+            }
+
+
+init : App Data ActionData RouteParams -> Shared.Model -> ( Model, Effect msg )
+init app model =
+    ( { positions = app.data.initialPositions
+      , mouseState = MouseNotDragging
+      }
+    , Effect.none
+    )
+
+
+update : App Data ActionData RouteParams -> Shared.Model -> Msg -> Model -> ( Model, Effect msg )
+update arg1 arg2 msg model =
+    case msg of
+        MouseDown postId position ->
+            ( { model | mouseState = MouseDragging postId position position }, Effect.none )
+
+        MouseMove position ->
+            ( case model.mouseState of
+                MouseNotDragging ->
+                    model
+
+                MouseDragging postId initialPosition _ ->
+                    { model | mouseState = MouseDragging postId initialPosition position }
+            , Effect.none
+            )
+
+        MouseUp ->
+            ( case model.mouseState of
+                MouseNotDragging ->
+                    model
+
+                MouseDragging postId initialPosition draggedPosition ->
+                    let
+                        vector : Vector2d Pixels ElementCoordinates
+                        vector =
+                            Vector2d.from initialPosition draggedPosition
+
+                        frame : Frame2d Pixels coordinates defines
+                        frame =
+                            Frame2d.atOrigin
+
+                        diff : Vector2d Pixels WorldCoordinates
+                        diff =
+                            Vector2d.relativeTo frame vector
+                    in
+                    { model
+                        | mouseState = MouseNotDragging
+                        , positions =
+                            SeqDict.updateIfExists
+                                postId
+                                (BoundingBox2d.translateBy diff)
+                                model.positions
+                    }
+            , Effect.none
+            )
+
+
+subscriptions : RouteParams -> UrlPath.UrlPath -> Shared.Model -> Model -> Sub msg
+subscriptions arg1 arg2 arg3 arg4 =
+    Sub.none
 
 
 head : App Data ActionData RouteParams -> List Head.Tag
@@ -203,7 +286,7 @@ monad params =
                         )
                     |> SeqDict.fromList
             , name = board.name
-            , positions = positions
+            , initialPositions = positions
             }
     in
     result
@@ -227,26 +310,51 @@ positionsData boardId =
 
 positionsCodec : Codec (SeqDict (Id PostId) Position)
 positionsCodec =
-    Codec.tuple Id.codec boundingBoxCodec
+    Codec.tuple Id.codec positionCodec
         |> Codec.list
         |> Codec.map SeqDict.fromList SeqDict.toList
 
 
-boundingBoxCodec : Codec Position
-boundingBoxCodec =
-    Codec.object
-        (\minX maxX minY maxY ->
-            { minX = minX
-            , maxX = maxX
-            , minY = minY
-            , maxY = maxY
-            }
+positionCodec : Codec Position
+positionCodec =
+    boundingBox2dCodec
+
+
+boundingBox2dCodec : Codec (BoundingBox2d unit coordinates)
+boundingBox2dCodec =
+    Codec.map
+        BoundingBox2d.fromExtrema
+        boundingBox2dToExtrema
+        (Codec.object
+            (\minX maxX minY maxY ->
+                { minX = minX
+                , maxX = maxX
+                , minY = minY
+                , maxY = maxY
+                }
+            )
+            |> Codec.field "minX" .minX (quantityCodec Codec.float)
+            |> Codec.field "maxX" .maxX (quantityCodec Codec.float)
+            |> Codec.field "minY" .minY (quantityCodec Codec.float)
+            |> Codec.field "maxY" .maxY (quantityCodec Codec.float)
+            |> Codec.buildObject
         )
-        |> Codec.field "minX" .minX (quantityCodec Codec.float)
-        |> Codec.field "maxX" .maxX (quantityCodec Codec.float)
-        |> Codec.field "minY" .minY (quantityCodec Codec.float)
-        |> Codec.field "maxY" .maxY (quantityCodec Codec.float)
-        |> Codec.buildObject
+
+
+boundingBox2dToExtrema :
+    BoundingBox2d units coordinates
+    ->
+        { minX : Quantity Float units
+        , maxX : Quantity Float units
+        , minY : Quantity Float units
+        , maxY : Quantity Float units
+        }
+boundingBox2dToExtrema boundingBox =
+    { minX = BoundingBox2d.minX boundingBox
+    , maxX = BoundingBox2d.maxX boundingBox
+    , minY = BoundingBox2d.minY boundingBox
+    , maxY = BoundingBox2d.maxY boundingBox
+    }
 
 
 quantityCodec : Codec number -> Codec (Quantity number unit)
@@ -320,8 +428,8 @@ getCharacter id color =
             )
 
 
-view : App Data ActionData RouteParams -> Model -> View msg
-view app _ =
+view : App Data ActionData RouteParams -> Shared.Model -> Model -> View msg
+view app _ model =
     { title = app.data.name
     , body =
         let
@@ -343,8 +451,23 @@ view app _ =
             , Html.Attributes.style "padding" "8px"
             , Html.Attributes.style "align-items" "start"
             ]
-            [ app.data.posts
-                |> SeqDict.values
+            [ SeqDict.merge
+                (\_ post acc ->
+                    ( post
+                    , BoundingBox2d.fromExtrema
+                        { minX = Quantity.zero
+                        , minY = Quantity.zero
+                        , maxX = Pixels.pixels 10
+                        , maxY = Pixels.pixels 10
+                        }
+                    )
+                        :: acc
+                )
+                (\_ post position acc -> ( post, position ) :: acc)
+                (\_ _ acc -> acc)
+                app.data.posts
+                model.positions
+                []
                 |> List.map viewPost
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
@@ -357,13 +480,17 @@ view app _ =
     }
 
 
-viewPost : { post : ( PostDetails, List Reply ), hasAnnotations : Bool } -> Html msg
-viewPost { post } =
+viewPost : ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> Html msg
+viewPost ( { post }, boundingBox ) =
+    let
+        ( w, h ) =
+            BoundingBox2d.dimensions boundingBox
+    in
     TypedSvg.rect
-        [ TypedSvg.Attributes.InPx.x 0
-        , TypedSvg.Attributes.InPx.y 0
-        , TypedSvg.Attributes.InPx.width 10
-        , TypedSvg.Attributes.InPx.height 10
+        [ TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
+        , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
+        , TypedSvg.Attributes.InPixels.width w
+        , TypedSvg.Attributes.InPixels.height h
         ]
         []
 
