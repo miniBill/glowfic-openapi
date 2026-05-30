@@ -458,7 +458,7 @@ assignColors list =
         len =
             toFloat (List.length list)
     in
-    List.indexedMap (\i e -> ( e, Oklch.oklch 0.7 0.2 (toFloat i / len) )) list
+    List.indexedMap (\i e -> ( e, Oklch.oklch 0.7 0.2 (toFloat i / 9) )) list
 
 
 childrenToString : List Html.Parser.Node -> String
