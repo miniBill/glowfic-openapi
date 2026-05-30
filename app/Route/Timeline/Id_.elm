@@ -9,6 +9,8 @@ import BoundingBox2d.Extra
 import Codec exposing (Codec)
 import Color
 import Color.Oklch as Oklch exposing (Oklch)
+import Dict
+import Dict.Extra
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
@@ -19,7 +21,7 @@ import GlowficApi.Types exposing (PostDetails, PostSummary, Reply, Status(..))
 import GlowficRoute
 import Head
 import Head.Seo as Seo
-import Html exposing (Html)
+import Html exposing (Html, q)
 import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
@@ -46,6 +48,7 @@ import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
 import Shared
 import String.Extra
+import Triple.Extra
 import TypedSvg
 import TypedSvg.Attributes
 import TypedSvg.Attributes.InMeters
@@ -488,11 +491,12 @@ view app _ model =
             , Html.Attributes.style "color" "#f3f3f3"
             , Html.Attributes.style "background" "#211e2f"
             , Html.Attributes.style "gap" "8px"
-            , Html.Attributes.style "padding" "8px"
             , Html.Attributes.style "align-items" "start"
             , Html.Attributes.style "height" "100dvh"
             ]
-            [ let
+            [ Html.Lazy.lazy viewPostsList app.data.initialPosts
+            , Html.div [ Html.Attributes.style "flex" "1 0 0" ] []
+            , let
                 postsList : List PostData
                 postsList =
                     model.posts
@@ -725,6 +729,93 @@ innerViewPost =
         )
 
 
+viewPostsList : SeqDict (Id PostId) PostData -> Html msg
+viewPostsList posts =
+    posts
+        |> SeqDict.values
+        |> List.map
+            (\postData ->
+                case postData.post.section of
+                    OpenApi.Common.Null ->
+                        ( -1, "", postData )
+
+                    OpenApi.Common.Present section ->
+                        ( section.order, section.name, postData )
+            )
+        |> Dict.Extra.groupBy (\( ord, name, _ ) -> ( ord, name ))
+        |> Dict.toList
+        |> List.concatMap viewPostSectionForList
+        |> Html.div
+            [ Html.Attributes.style "display" "grid"
+            , Html.Attributes.style "grid-template-columns" "40px auto"
+            , Html.Attributes.style "gap" "8px"
+            , Html.Attributes.style "padding" "8px"
+            , Html.Attributes.style "width" "200px"
+            , Html.Attributes.style "overflow" "scroll"
+            , Html.Attributes.style "height" "calc(100dvh - 16px)"
+            ]
+
+
+viewPostSectionForList : ( ( int, String ), List ( int, string, PostData ) ) -> List (Html msg)
+viewPostSectionForList ( ( _, sectionName ), posts ) =
+    let
+        titleViews : List (Html msg)
+        titleViews =
+            if String.isEmpty sectionName then
+                []
+
+            else
+                [ Html.div
+                    [ Html.Attributes.style "font-weight" "bold"
+                    , Html.Attributes.style "grid-column" "1 / span 2"
+                    ]
+                    [ Html.text sectionName ]
+                ]
+
+        postsViews : List (Html msg)
+        postsViews =
+            posts
+                |> List.sortBy (\( _, _, { post } ) -> Id.toInt post.id)
+                |> List.concatMap (\( _, _, postData ) -> viewPostForList postData)
+    in
+    titleViews ++ postsViews
+
+
+viewPostForList : PostData -> List (Html msg)
+viewPostForList { post, annotations } =
+    let
+        cutTitle : String
+        cutTitle =
+            String.Extra.ellipsis 40 post.subject
+    in
+    [ Html.div []
+        [ [ case post.status of
+                Status__Complete ->
+                    "✅"
+
+                Status__Active ->
+                    "✍️"
+
+                Status__Abandoned ->
+                    "💀"
+          , if List.isEmpty annotations then
+                "⚠️"
+
+            else
+                ""
+          ]
+            |> List.Extra.removeWhen String.isEmpty
+            |> String.join " "
+            |> Html.text
+        ]
+    , Route.link
+        [ Html.Attributes.style "display" "block"
+        ]
+        [ Html.text cutTitle ]
+        (Route.Timeline__Post__Id_ { id = Id.toString post.id })
+    ]
+
+
 viewCharactersList : SeqDict (Id CharacterId) CharacterSummary -> Html msg
 viewCharactersList characters =
     characters
@@ -734,6 +825,7 @@ viewCharactersList characters =
             [ Html.Attributes.style "display" "grid"
             , Html.Attributes.style "grid-template-columns" "40px auto"
             , Html.Attributes.style "gap" "8px"
+            , Html.Attributes.style "padding" "8px"
             , Html.Attributes.style "width" "200px"
             , Html.Attributes.style "overflow" "scroll"
             , Html.Attributes.style "height" "calc(100dvh - 16px)"
@@ -791,49 +883,6 @@ viewCharacterNames appData =
                         Html.Attributes.style "color" "white"
                     ]
                     [ Html.text name ]
-            )
-
-
-viewPostTitles : Model -> List (Html msg)
-viewPostTitles model =
-    model.posts
-        |> SeqDict.values
-        |> List.map
-            (\{ post, annotations } ->
-                let
-                    cutTitle : String
-                    cutTitle =
-                        String.Extra.ellipsis 40 post.subject
-                in
-                Route.link
-                    [ Html.Attributes.style "display" "block"
-                    , Html.Attributes.style "grid-row-start" "post-name-start"
-                    , Html.Attributes.style "grid-column-start" ("p" ++ Id.toString post.id ++ "-start")
-                    , Html.Attributes.style "writing-mode" "vertical-rl"
-                    , Html.Attributes.style "text-orientation" "mixed"
-                    , Html.Attributes.style "align-self" "start"
-                    ]
-                    [ [ case post.status of
-                            Status__Complete ->
-                                "✅"
-
-                            Status__Active ->
-                                "✍️"
-
-                            Status__Abandoned ->
-                                "💀"
-                      , if List.isEmpty annotations then
-                            "⚠️"
-
-                        else
-                            ""
-                      , cutTitle
-                      ]
-                        |> List.Extra.removeWhen String.isEmpty
-                        |> String.join " "
-                        |> Html.text
-                    ]
-                    (Route.Timeline__Post__Id_ { id = Id.toString post.id })
             )
 
 
