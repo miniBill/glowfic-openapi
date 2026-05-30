@@ -1,6 +1,6 @@
-module GlowficRoute exposing (character, post, reply)
+module GlowficRoute exposing (character, icon, post, reply)
 
-import Id exposing (CharacterId, Id, PostId, ReplyId)
+import Id exposing (CharacterId, IconId, Id, PostId, ReplyId)
 
 
 reply : Id ReplyId -> String
@@ -16,3 +16,8 @@ post pid =
 character : Id CharacterId -> String
 character cid =
     "https://glowfic.com/characters/" ++ Id.toString cid
+
+
+icon : Id IconId -> String
+icon cid =
+    "https://glowfic.com/icons/" ++ Id.toString cid

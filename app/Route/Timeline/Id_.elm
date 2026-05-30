@@ -1,6 +1,6 @@
 module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, MouseState, Msg, RouteParams, route)
 
-import Annotation exposing (Annotation, MessageId)
+import Annotation exposing (Annotation(..), MessageId)
 import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.File as File
@@ -24,7 +24,7 @@ import Head.Seo as Seo
 import Html exposing (Html, q)
 import Html.Attributes
 import Html.Events
-import Html.Events.Extra.Mouse as Mouse
+import Html.Events.Extra.Mouse as Mouse exposing (Button(..))
 import Html.Events.Extra.Pointer as Pointer
 import Html.Lazy
 import Html.Parser
@@ -105,6 +105,7 @@ type Msg
 
 type alias PointerEvent =
     { offsetPosition : Point2d Pixels {}
+    , button : Mouse.Button
     , elementSize : { width : Quantity Float Pixels, height : Quantity Float Pixels }
     }
 
@@ -145,29 +146,33 @@ update : App Data ActionData RouteParams -> Shared.Model -> Msg -> Model -> ( Mo
 update app _ msg model =
     case msg of
         MouseDown event ->
-            let
-                initialPosition : Point2d Meters {}
-                initialPosition =
-                    event.offsetPosition
-                        |> Point2d.at (pixelsToMeters event)
-            in
-            case
-                model.posts
-                    |> SeqDict.values
-                    |> List.Extra.findMap
-                        (\{ post, boundingBox } ->
-                            if BoundingBox2d.contains initialPosition boundingBox then
-                                Just post.id
+            if event.button /= Mouse.MainButton then
+                ( model, Effect.none )
 
-                            else
-                                Nothing
-                        )
-            of
-                Nothing ->
-                    ( model, Effect.none )
+            else
+                let
+                    initialPosition : Point2d Meters {}
+                    initialPosition =
+                        event.offsetPosition
+                            |> Point2d.at (pixelsToMeters event)
+                in
+                case
+                    model.posts
+                        |> SeqDict.values
+                        |> List.Extra.findMap
+                            (\{ post, boundingBox } ->
+                                if BoundingBox2d.contains initialPosition boundingBox then
+                                    Just post.id
 
-                Just postId ->
-                    ( { model | mouseState = MouseDragging postId initialPosition initialPosition }, Effect.none )
+                                else
+                                    Nothing
+                            )
+                of
+                    Nothing ->
+                        ( model, Effect.none )
+
+                    Just postId ->
+                        ( { model | mouseState = MouseDragging postId initialPosition initialPosition }, Effect.none )
 
         MouseMove event ->
             ( case model.mouseState of
@@ -186,28 +191,32 @@ update app _ msg model =
             )
 
         MouseUp event ->
-            ( case model.mouseState of
-                MouseNotDragging ->
-                    model
+            if event.button /= Mouse.MainButton then
+                ( model, Effect.none )
 
-                MouseDragging postId initialPosition draggedPosition ->
-                    let
-                        vector : Vector2d Meters {}
-                        vector =
-                            Vector2d.from initialPosition draggedPosition
-                    in
-                    { model
-                        | mouseState = MouseNotDragging
-                        , posts =
-                            SeqDict.updateIfExists
-                                postId
-                                (\post ->
-                                    { post | boundingBox = BoundingBox2d.translateBy vector post.boundingBox }
-                                )
-                                model.posts
-                    }
-            , Effect.none
-            )
+            else
+                ( case model.mouseState of
+                    MouseNotDragging ->
+                        model
+
+                    MouseDragging postId initialPosition draggedPosition ->
+                        let
+                            vector : Vector2d Meters {}
+                            vector =
+                                Vector2d.from initialPosition draggedPosition
+                        in
+                        { model
+                            | mouseState = MouseNotDragging
+                            , posts =
+                                SeqDict.updateIfExists
+                                    postId
+                                    (\post ->
+                                        { post | boundingBox = BoundingBox2d.translateBy vector post.boundingBox }
+                                    )
+                                    model.posts
+                        }
+                , Effect.none
+                )
 
 
 pixelsToMeters : PointerEvent -> Quantity Float (Quantity.Rate Meters Pixels)
@@ -503,15 +512,17 @@ view app _ model =
                         |> SeqDict.values
                         |> List.reverse
 
-                postsViews : List (Html Msg)
+                postsViews : Html Msg
                 postsViews =
-                    List.map (viewPost model.mouseState) postsList
+                    TypedSvg.g [] (List.map (viewPost model.mouseState) postsList)
 
-                charactersViews : List (Html msg)
+                charactersViews : Html msg
                 charactersViews =
                     viewCharacters postsList
               in
-              (postsViews ++ charactersViews)
+              [ postsViews
+              , charactersViews
+              ]
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
                     , Html.Attributes.style "max-width" "100vw"
@@ -533,13 +544,66 @@ view app _ model =
     }
 
 
-viewCharacters : List PostData -> List (Html msg)
+viewCharacters : List PostData -> Html msg
 viewCharacters posts =
     posts
-        |> List.indexedMap
-            (\i _ ->
-                Html.text "TODO"
+        |> List.concatMap
+            (\{ boundingBox, annotations } ->
+                List.filterMap (annotationToPoint boundingBox) annotations
             )
+        |> Dict.Extra.groupBy (\( characterId, _ ) -> Id.toInt characterId)
+        |> Dict.values
+        |> List.map
+            (\t ->
+                case t of
+                    [] ->
+                        Html.text ""
+
+                    ( id, _ ) :: _ ->
+                        pointsToSpline id (List.map Tuple.second t)
+            )
+        |> TypedSvg.g []
+
+
+pointsToSpline : Id CharacterId -> List (Point2d Meters {}) -> Html msg
+pointsToSpline id points =
+    let
+        path =
+            points
+                |> List.indexedMap
+                    (\i p ->
+                        let
+                            { x, y } =
+                                Point2d.toMeters p
+                        in
+                        if i == 0 then
+                            "M " ++ String.fromFloat x ++ " " ++ String.fromFloat y
+
+                        else
+                            "L " ++ String.fromFloat x ++ " " ++ String.fromFloat y
+                    )
+                |> String.join " "
+    in
+    TypedSvg.path [ TypedSvg.Attributes.path path ] []
+
+
+annotationToPoint :
+    BoundingBox2d units coordinates
+    -> ( MessageId, Annotation )
+    -> Maybe ( Id CharacterId, Point2d units coordinates )
+annotationToPoint boundingBox ( _, annotation ) =
+    case annotation of
+        Enter characterId ->
+            Just ( characterId, BoundingBox2d.centerPoint boundingBox )
+
+        Exit _ ->
+            Nothing
+
+        HappensBefore _ ->
+            Nothing
+
+        HappensAfter _ ->
+            Nothing
 
 
 svgViewBoxSize :
@@ -572,24 +636,28 @@ eventDecoder =
         pixels =
             Json.Decode.map Pixels.pixels Json.Decode.float
     in
-    Json.Decode.map6
-        (\clientX clientY svgX svgY svgWidth svgHeight ->
+    Json.Decode.map5
+        (\svgX svgY svgWidth svgHeight event ->
+            let
+                ( clientX, clientY ) =
+                    event.clientPos
+            in
             { offsetPosition =
                 Point2d.xy
-                    (clientX |> Quantity.minus svgX)
-                    (clientY |> Quantity.minus svgY)
+                    (Pixels.pixels clientX |> Quantity.minus svgX)
+                    (Pixels.pixels clientY |> Quantity.minus svgY)
             , elementSize =
                 { width = svgWidth
                 , height = svgHeight
                 }
+            , button = event.button
             }
         )
-        (Json.Decode.field "clientX" pixels)
-        (Json.Decode.field "clientY" pixels)
         (Json.Decode.at [ "currentTarget", "__boundingBox", "x" ] pixels)
         (Json.Decode.at [ "currentTarget", "__boundingBox", "y" ] pixels)
         (Json.Decode.at [ "currentTarget", "__boundingBox", "width" ] pixels)
         (Json.Decode.at [ "currentTarget", "__boundingBox", "height" ] pixels)
+        Mouse.eventDecoder
 
 
 defaultBoundingBox : Int -> BoundingBox2d Meters {}
@@ -835,10 +903,10 @@ viewCharactersList characters =
 viewCharacterForList : ( Id CharacterId, CharacterSummary ) -> List (Html msg)
 viewCharacterForList ( characterId, { name, icon, color } ) =
     [ case icon of
-        Just { url } ->
+        Just { id, url } ->
             Html.a
                 [ Html.Attributes.class "icon"
-                , Html.Attributes.href (GlowficRoute.character characterId)
+                , Html.Attributes.href (GlowficRoute.icon id)
                 , Html.Attributes.title name
                 , Html.Attributes.style "display" "block"
                 ]
@@ -852,13 +920,15 @@ viewCharacterForList ( characterId, { name, icon, color } ) =
 
         Nothing ->
             Html.div [] []
-    , Html.div
+    , Html.a
         [ Html.Attributes.style "background" (Oklch.toCssString color)
+        , Html.Attributes.style "display" "block"
         , if color.lightness > 0.5 then
             Html.Attributes.style "color" "black"
 
           else
             Html.Attributes.style "color" "white"
+        , Html.Attributes.href (GlowficRoute.character characterId)
         ]
         [ Html.text name ]
     ]
