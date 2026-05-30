@@ -490,6 +490,7 @@ view app _ model =
             , Html.Attributes.style "gap" "8px"
             , Html.Attributes.style "padding" "8px"
             , Html.Attributes.style "align-items" "start"
+            , Html.Attributes.style "height" "100dvh"
             ]
             [ let
                 postsList : List PostData
@@ -510,6 +511,7 @@ view app _ model =
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
                     , Html.Attributes.style "max-width" "100vw"
+                    , Html.Attributes.style "height" "calc(100dvh - 16px)"
                     , TypedSvg.Attributes.InMeters.viewBox
                         Quantity.zero
                         Quantity.zero
@@ -518,7 +520,9 @@ view app _ model =
                     , mouseEventWithSize "pointerdown" MouseDown
                     , mouseEventWithSize "pointermove" MouseMove
                     , mouseEventWithSize "pointerup" MouseUp
+                    , Html.Attributes.style "background" "#228"
                     ]
+            , Html.div [ Html.Attributes.style "flex" "1 0 0" ] []
             , Html.Lazy.lazy viewCharactersList app.data.characters
             ]
         ]
@@ -540,7 +544,7 @@ svgViewBoxSize :
     }
 svgViewBoxSize =
     { width = Length.meters 2
-    , height = Length.meters 4
+    , height = Length.meters 3
     }
 
 
@@ -591,7 +595,7 @@ defaultBoundingBox i =
         columns =
             Quantity.ratio
                 (svgViewBoxSize.width
-                    |> Quantity.plus (Length.centimeters gap)
+                    |> Quantity.minus (Length.centimeters gap)
                 )
                 (Length.centimeters (defaultWidth + gap))
                 |> floor
@@ -618,10 +622,10 @@ defaultBoundingBox i =
             10
     in
     BoundingBox2d.fromExtrema
-        { minX = Length.centimeters ((defaultWidth + gap) * toFloat column)
-        , minY = Length.centimeters ((defaultHeight + gap) * toFloat row)
-        , maxX = Length.centimeters ((defaultWidth + gap) * toFloat column + defaultWidth)
-        , maxY = Length.centimeters ((defaultHeight + gap) * toFloat row + defaultHeight)
+        { minX = Length.centimeters (gap + (defaultWidth + gap) * toFloat column)
+        , minY = Length.centimeters (gap + (defaultHeight + gap) * toFloat row)
+        , maxX = Length.centimeters (gap + (defaultWidth + gap) * toFloat column + defaultWidth)
+        , maxY = Length.centimeters (gap + (defaultHeight + gap) * toFloat row + defaultHeight)
         }
 
 
@@ -731,6 +735,8 @@ viewCharactersList characters =
             , Html.Attributes.style "grid-template-columns" "40px auto"
             , Html.Attributes.style "gap" "8px"
             , Html.Attributes.style "width" "200px"
+            , Html.Attributes.style "overflow" "scroll"
+            , Html.Attributes.style "height" "calc(100dvh - 16px)"
             ]
 
 
