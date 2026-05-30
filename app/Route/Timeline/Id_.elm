@@ -574,7 +574,7 @@ defaultBoundingBox =
     BoundingBox2d.fromExtrema
         { minX = Quantity.zero
         , minY = Quantity.zero
-        , maxX = Length.centimeters 10
+        , maxX = Length.centimeters 12
         , maxY = Length.centimeters 10
         }
 
@@ -609,22 +609,25 @@ viewPost mouseState ( d, boundingBox ) =
         ( w, h ) =
             BoundingBox2d.dimensions boundingBox
 
+        cx : Quantity Float Meters
         cx =
-            Quantity.plus x (Quantity.half (BoundingBox2d.Extra.width defaultBoundingBox))
+            Quantity.plus x (Quantity.half w)
 
+        cy : Quantity Float Meters
         cy =
-            Quantity.plus y (Quantity.half (BoundingBox2d.Extra.height defaultBoundingBox))
+            Quantity.plus y (Quantity.half h)
 
         lines : List String
         lines =
             post.subject
-                |> String.Extra.softWrap 14
+                |> String.Extra.softWrap 10
                 |> String.lines
 
         linesCount : Int
         linesCount =
             List.length lines
 
+        fontSize : Length
         fontSize =
             Length.centimeters 2
     in
