@@ -1,8 +1,8 @@
-module Glowfic.Utils exposing (allCharactersIds, annotationsCodec, boardAnnotationsFilename, boardAnnotationsFilepath, calculatePostAnnotations, postAnnotationsFilename, postAnnotationsFilepath, readAnnotationsFromFile)
+module Glowfic.Utils exposing (allCharactersIds, annotationsCodec, boardAnnotationsFilename, boardAnnotationsFilepath, calculatePostAnnotations, postAnnotationsFilename, readAnnotationsFromFile)
 
 import Annotation exposing (Annotation(..), MessageId(..))
 import BackendTask exposing (BackendTask)
-import BackendTask.File as File exposing (FileReadError(..))
+import BackendTask.File as File
 import Codec exposing (Codec)
 import FatalError exposing (FatalError)
 import GlowficApi.Types exposing (PostDetails, Reply)
@@ -11,7 +11,6 @@ import Id exposing (BoardId, CharacterId, Id, PostId)
 import Json.Decode
 import List.Extra
 import Maybe.Extra
-import Monad exposing (Monad)
 import Parser exposing ((|.), (|=), Parser)
 import Parser.Extra
 import Result.Extra
@@ -73,7 +72,10 @@ readAnnotationsFromFile postId =
                             File.FileDoesntExist ->
                                 BackendTask.succeed Nothing
 
-                            _ ->
+                            File.FileReadError _ ->
+                                BackendTask.fail e.fatal
+
+                            File.DecodingError _ ->
                                 BackendTask.fail e.fatal
 
                     Ok rawString ->

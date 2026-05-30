@@ -1,11 +1,10 @@
-module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, MouseState, Msg, RouteParams, route)
+module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, MouseState, Msg, PostData, RouteParams, route)
 
 import Annotation exposing (Annotation(..), MessageId)
 import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.File as File
 import BoundingBox2d exposing (BoundingBox2d)
-import BoundingBox2d.Extra
 import Codec exposing (Codec)
 import Color
 import Color.Oklch as Oklch exposing (Oklch)
@@ -14,18 +13,16 @@ import Dict.Extra
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
-import Frame2d exposing (Frame2d)
 import Glowfic.Utils
 import GlowficApi.Extra
 import GlowficApi.Types exposing (PostDetails, PostSummary, Reply, Status(..))
 import GlowficRoute
 import Head
 import Head.Seo as Seo
-import Html exposing (Html, q)
+import Html exposing (Html)
 import Html.Attributes
 import Html.Events
-import Html.Events.Extra.Mouse as Mouse exposing (Button(..))
-import Html.Events.Extra.Pointer as Pointer
+import Html.Events.Extra.Mouse as Mouse
 import Html.Lazy
 import Html.Parser
 import Id exposing (BoardId, CharacterId, IconId, Id, PostId)
@@ -45,16 +42,14 @@ import Round
 import Route
 import RouteBuilder exposing (App, StatefulRoute)
 import SeqDict exposing (SeqDict)
-import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
 import Shared
 import String.Extra
-import Triple.Extra
 import TypedSvg
 import TypedSvg.Attributes
 import TypedSvg.Attributes.InMeters
 import TypedSvg.Core
-import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), LengthAdjust(..), Paint(..))
+import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..))
 import Url exposing (Url)
 import UrlPath exposing (UrlPath)
 import Vector2d exposing (Vector2d)
@@ -135,7 +130,7 @@ route =
             { init = init
             , update = update
             , subscriptions = subscriptions
-            , view = \app shared model -> view app shared model |> View.map PagesMsg.fromMsg
+            , view = \app _ model -> view app model |> View.map PagesMsg.fromMsg
             }
 
 
@@ -467,11 +462,6 @@ nonCanonical post =
 
 assignColors : List id -> List ( id, Oklch )
 assignColors list =
-    let
-        len : Float
-        len =
-            toFloat (List.length list)
-    in
     List.indexedMap (\i e -> ( e, Oklch.oklch 0.7 0.2 (toFloat i / 9) )) list
 
 
@@ -521,8 +511,8 @@ getCharacter id color =
             )
 
 
-view : App Data ActionData RouteParams -> Shared.Model -> Model -> View Msg
-view app _ model =
+view : App Data ActionData RouteParams -> Model -> View Msg
+view app model =
     { title = app.data.name
     , body =
         [ Html.div
@@ -546,7 +536,7 @@ view app _ model =
               [ TypedSvg.g
                     [ TypedSvg.Attributes.id "wordlines"
                     ]
-                    (viewWordlines app.data.characters postsList)
+                    (viewWordlines app.data.characters model.selectedCharacter postsList)
               , TypedSvg.g
                     [ TypedSvg.Attributes.id "posts"
                     ]
@@ -581,8 +571,8 @@ view app _ model =
     }
 
 
-viewWordlines : SeqDict (Id CharacterId) CharacterSummary -> List PostData -> List (Html Msg)
-viewWordlines characters posts =
+viewWordlines : SeqDict (Id CharacterId) CharacterSummary -> Maybe (Id CharacterId) -> List PostData -> List (Html Msg)
+viewWordlines characters selected posts =
     posts
         |> List.concatMap
             (\{ boundingBox, annotations } ->
@@ -597,12 +587,12 @@ viewWordlines characters posts =
                         Html.text ""
 
                     ( id, _ ) :: _ ->
-                        viewWordline id (SeqDict.get id characters) (List.map Tuple.second t)
+                        viewWordline selected id (SeqDict.get id characters) (List.map Tuple.second t)
             )
 
 
-viewWordline : Id CharacterId -> Maybe CharacterSummary -> List (Point2d Meters {}) -> Html Msg
-viewWordline id maybeCharacter points =
+viewWordline : Maybe (Id CharacterId) -> Id CharacterId -> Maybe CharacterSummary -> List (Point2d Meters {}) -> Html Msg
+viewWordline selected id maybeCharacter points =
     let
         path : String
         path =
@@ -629,15 +619,16 @@ viewWordline id maybeCharacter points =
                     )
                 |> String.join " "
 
-        characterAttrs =
+        ( characterAttrs, stroke ) =
             case maybeCharacter of
                 Nothing ->
-                    []
+                    ( [], Oklch.oklch 1 0 0 )
 
                 Just character ->
-                    [ TypedSvg.Attributes.title character.name
-                    , TypedSvg.Core.attribute "stroke" (Oklch.toCssString character.color)
-                    ]
+                    ( [ TypedSvg.Attributes.title character.name
+                      ]
+                    , character.color
+                    )
     in
     TypedSvg.path
         ([ TypedSvg.Attributes.d path
@@ -645,6 +636,11 @@ viewWordline id maybeCharacter points =
          , TypedSvg.Attributes.InMeters.strokeWidth (Length.centimeters 1.5)
          , Html.Events.onMouseEnter (MouseEnterCharacter id)
          , Html.Events.onMouseLeave (MouseLeaveCharacter id)
+         , if selected == Nothing || selected == Just id then
+            TypedSvg.Core.attribute "stroke" (Oklch.toCssString stroke)
+
+           else
+            TypedSvg.Core.attribute "stroke" "#ffffff20"
          ]
             ++ characterAttrs
         )
@@ -1005,28 +1001,6 @@ viewCharacterForList ( characterId, { name, icon, color } ) =
     ]
 
 
-viewCharacterNames : Data -> List (Html msg)
-viewCharacterNames appData =
-    appData.characters
-        |> SeqDict.toList
-        |> List.map
-            (\( id, { name, color } ) ->
-                Html.a
-                    [ Html.Attributes.href (GlowficRoute.character id)
-                    , Html.Attributes.style "display" "block"
-                    , Html.Attributes.style "grid-column-start" "character-name-start"
-                    , Html.Attributes.style "grid-row-start" ("c" ++ Id.toString id ++ "-start")
-                    , Html.Attributes.style "background" (Oklch.toCssString color)
-                    , if color.lightness > 0.5 then
-                        Html.Attributes.style "color" "black"
-
-                      else
-                        Html.Attributes.style "color" "white"
-                    ]
-                    [ Html.text name ]
-            )
-
-
 
 -- viewLinksAsGraph : Data -> Html msg
 -- viewLinksAsGraph appData =
@@ -1118,46 +1092,3 @@ viewCharacterNames appData =
 --                     |> String.replace "{pid}" (Id.toString pid)
 --                     |> Html.text
 --                 ]
-
-
-viewPostCharacters : Data -> ( PostDetails, List Reply ) -> List (Html msg)
-viewPostCharacters appData ( post, replies ) =
-    let
-        charactersIds : SeqDict (Id CharacterId) (SeqSet String)
-        charactersIds =
-            Glowfic.Utils.allCharactersIds ( post, replies )
-    in
-    charactersIds
-        |> SeqDict.keys
-        |> List.Extra.stableSortWith
-            (\l r ->
-                case
-                    ( SeqDict.get l appData.characters |> Maybe.andThen .icon
-                    , SeqDict.get r appData.characters |> Maybe.andThen .icon
-                    )
-                of
-                    ( Nothing, Just _ ) ->
-                        GT
-
-                    ( Just _, Nothing ) ->
-                        LT
-
-                    ( Nothing, Nothing ) ->
-                        EQ
-
-                    ( Just _, Just _ ) ->
-                        EQ
-            )
-        |> List.map
-            (\characterId ->
-                Html.div
-                    [ -- Html.Attributes.style "height" "60px"
-                      -- , Html.Attributes.style "width" "10px"
-                      -- ,
-                      Html.Attributes.style "border" "1px solid white"
-                    , Html.Attributes.style "padding" "4px"
-                    , Html.Attributes.style "grid-row-start" ("c" ++ Id.toString characterId ++ "-start")
-                    , Html.Attributes.style "grid-column-start" ("p" ++ Id.toString post.id ++ "-start")
-                    ]
-                    [ Html.text "X" ]
-            )

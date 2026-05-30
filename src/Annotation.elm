@@ -16,18 +16,6 @@ type MessageId
     | MessageIdPost (Id PostId)
 
 
-messageIdToString : MessageId -> String
-messageIdToString id =
-    case id of
-        MessageIdPost pid ->
-            "Post {pid}"
-                |> String.replace "{pid}" (Id.toString pid)
-
-        MessageIdReply rid ->
-            "Reply {rid}"
-                |> String.replace "{rid}" (Id.toString rid)
-
-
 codec : Codec Annotation
 codec =
     Codec.custom

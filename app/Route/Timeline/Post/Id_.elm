@@ -2,8 +2,7 @@ module Route.Timeline.Post.Id_ exposing (ActionData, Data, Model, Msg, RoutePara
 
 import Annotation exposing (Annotation(..), MessageId(..))
 import BackendTask exposing (BackendTask)
-import BackendTask.File as File
-import Codec exposing (Codec)
+import Codec
 import Effect exposing (Effect)
 import ErrorPage exposing (ErrorPage)
 import FatalError exposing (FatalError)
@@ -15,19 +14,13 @@ import Head.Seo as Seo
 import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Events
-import Html.Parser
 import Id exposing (CharacterId, Id, PostId, ReplyId)
-import Json.Decode
 import List.Extra
 import Maybe.Extra
 import Monad exposing (Monad)
 import Monad.Do as Do
 import Pages.Url
 import PagesMsg exposing (PagesMsg)
-import Parser exposing ((|.), (|=), Parser)
-import Parser.Extra
-import Result.Extra
-import Rope exposing (Rope)
 import RouteBuilder exposing (App, StatefulRoute)
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
