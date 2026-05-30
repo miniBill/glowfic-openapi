@@ -659,7 +659,7 @@ svgViewBoxSize :
     , height : Length
     }
 svgViewBoxSize =
-    { width = Length.meters 2
+    { width = Length.meters 4
     , height = Length.meters 3
     }
 
