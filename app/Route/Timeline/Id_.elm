@@ -1,4 +1,4 @@
-module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, MouseState, Msg, Position, RouteParams, route)
+module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, MouseState, Msg, RouteParams, route)
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
@@ -62,14 +62,17 @@ type alias ActionData =
 
 type alias Data =
     { name : String
-    , posts : SeqDict (Id PostId) { post : ( PostDetails, List Reply ), hasAnnotations : Bool }
+    , initialPosts : SeqDict (Id PostId) PostData
     , characters : SeqDict (Id CharacterId) CharacterSummary
-    , initialPositions : SeqDict (Id PostId) Position
     }
 
 
-type alias Position =
-    BoundingBox2d Meters {}
+type alias PostData =
+    { post : PostDetails
+    , replies : List Reply
+    , hasAnnotations : Bool
+    , boundingBox : BoundingBox2d Meters {}
+    }
 
 
 type alias CharacterSummary =
@@ -80,7 +83,7 @@ type alias CharacterSummary =
 
 
 type alias Model =
-    { positions : SeqDict (Id PostId) Position
+    { posts : SeqDict (Id PostId) PostData
     , mouseState : MouseState
     }
 
@@ -127,7 +130,7 @@ route =
 
 init : App Data ActionData RouteParams -> Shared.Model -> ( Model, Effect msg )
 init app _ =
-    ( { positions = app.data.initialPositions
+    ( { posts = app.data.initialPosts
       , mouseState = MouseNotDragging
       }
     , Effect.none
@@ -145,11 +148,12 @@ update app _ msg model =
                         |> Point2d.at (pixelsToMeters event)
             in
             case
-                postsAndPositions app model
+                model.posts
+                    |> SeqDict.values
                     |> List.Extra.findMap
-                        (\( { post }, boundingBox ) ->
+                        (\{ post, boundingBox } ->
                             if BoundingBox2d.contains initialPosition boundingBox then
-                                Just (Tuple.first post).id
+                                Just post.id
 
                             else
                                 Nothing
@@ -190,16 +194,13 @@ update app _ msg model =
                     in
                     { model
                         | mouseState = MouseNotDragging
-                        , positions =
-                            SeqDict.update
+                        , posts =
+                            SeqDict.updateIfExists
                                 postId
-                                (\bb ->
-                                    bb
-                                        |> Maybe.withDefault (defaultBoundingBox 0)
-                                        |> BoundingBox2d.translateBy vector
-                                        |> Just
+                                (\post ->
+                                    { post | boundingBox = BoundingBox2d.translateBy vector post.boundingBox }
                                 )
-                                model.positions
+                                model.posts
                     }
             , Effect.none
             )
@@ -305,7 +306,7 @@ monad params =
                 characters
                     |> Maybe.Extra.values
                     |> SeqDict.fromList
-            , posts =
+            , initialPosts =
                 posts
                     |> List.sortBy
                         (\( ( p, _ ), _ ) ->
@@ -318,13 +319,18 @@ monad params =
                             , Id.toInt p.id
                             )
                         )
-                    |> List.map
-                        (\( ( p, r ), ann ) ->
-                            ( Id.for p, { post = ( p, r ), hasAnnotations = ann } )
+                    |> List.indexedMap
+                        (\i ( ( p, r ), ann ) ->
+                            ( Id.for p
+                            , { post = p
+                              , replies = r
+                              , hasAnnotations = ann
+                              , boundingBox = SeqDict.get p.id positions |> Maybe.withDefault (defaultBoundingBox i)
+                              }
+                            )
                         )
                     |> SeqDict.fromList
             , name = board.name
-            , initialPositions = positions
             }
     in
     result
@@ -332,7 +338,7 @@ monad params =
         |> Monad.succeed
 
 
-positionsData : Id BoardId -> BackendTask FatalError (SeqDict (Id PostId) Position)
+positionsData : Id BoardId -> BackendTask FatalError (SeqDict (Id PostId) (BoundingBox2d Meters {}))
 positionsData boardId =
     File.jsonFile (Codec.decoder positionsCodec) (Glowfic.Utils.boardAnnotationsFilepath boardId)
         |> BackendTask.onError
@@ -349,14 +355,14 @@ positionsData boardId =
             )
 
 
-positionsCodec : Codec (SeqDict (Id PostId) Position)
+positionsCodec : Codec (SeqDict (Id PostId) (BoundingBox2d Meters {}))
 positionsCodec =
     Codec.tuple Id.codec positionCodec
         |> Codec.list
         |> Codec.map SeqDict.fromList SeqDict.toList
 
 
-positionCodec : Codec Position
+positionCodec : Codec (BoundingBox2d Meters {})
 positionCodec =
     boundingBox2dCodec
 
@@ -481,9 +487,22 @@ view app _ model =
             , Html.Attributes.style "padding" "8px"
             , Html.Attributes.style "align-items" "start"
             ]
-            [ postsAndPositions app model
-                |> List.reverse
-                |> List.map (viewPost model.mouseState)
+            [ let
+                postsList : List ( Id PostId, PostData )
+                postsList =
+                    model.posts
+                        |> SeqDict.toList
+                        |> List.reverse
+
+                postsViews : List (Html Msg)
+                postsViews =
+                    List.map (viewPost model.mouseState) postsList
+
+                charactersViews : List (Html msg)
+                charactersViews =
+                    viewCharacters postsList
+              in
+              (postsViews ++ charactersViews)
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
                     , Html.Attributes.style "max-width" "100vw"
@@ -496,10 +515,15 @@ view app _ model =
                     , mouseEventWithSize "pointermove" MouseMove
                     , mouseEventWithSize "pointerup" MouseUp
                     ]
-            , Html.Lazy.lazy viewCharacters app.data.characters
+            , Html.Lazy.lazy viewCharactersList app.data.characters
             ]
         ]
     }
+
+
+viewCharacters : List ( Id PostId, PostData ) -> List (Html msg)
+viewCharacters posts =
+    []
 
 
 svgViewBoxSize :
@@ -552,25 +576,6 @@ eventDecoder =
         (Json.Decode.at [ "currentTarget", "__boundingBox", "height" ] pixels)
 
 
-postsAndPositions :
-    App Data ActionData RouteParams
-    -> Model
-    ->
-        List
-            ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }
-            , BoundingBox2d Meters {}
-            )
-postsAndPositions app model =
-    SeqDict.merge
-        (\_ post ( i, acc ) -> ( i + 1, ( post, defaultBoundingBox i ) :: acc ))
-        (\_ post position ( i, acc ) -> ( i, ( post, position ) :: acc ))
-        (\_ _ acc -> acc)
-        app.data.posts
-        model.positions
-        ( 0, [] )
-        |> Tuple.second
-
-
 defaultBoundingBox : Int -> BoundingBox2d Meters {}
 defaultBoundingBox i =
     let
@@ -612,12 +617,9 @@ defaultBoundingBox i =
         }
 
 
-viewPost : MouseState -> ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> Html Msg
-viewPost mouseState ( d, boundingBox ) =
+viewPost : MouseState -> ( id, PostData ) -> Html Msg
+viewPost mouseState ( _, postData ) =
     let
-        ( post, _ ) =
-            d.post
-
         vector : Vector2d Meters {}
         vector =
             case mouseState of
@@ -625,13 +627,13 @@ viewPost mouseState ( d, boundingBox ) =
                     Vector2d.zero
 
                 MouseDragging postId initialPosition draggedPosition ->
-                    if postId == post.id then
+                    if postId == postData.post.id then
                         Vector2d.from initialPosition draggedPosition
 
                     else
                         Vector2d.zero
     in
-    innerViewPost post vector boundingBox
+    innerViewPost postData.post vector postData.boundingBox
 
 
 innerViewPost : PostDetails -> Vector2d Meters {} -> BoundingBox2d Meters {} -> Html msg
@@ -711,11 +713,11 @@ innerViewPost =
         )
 
 
-viewCharacters : SeqDict (Id CharacterId) CharacterSummary -> Html msg
-viewCharacters characters =
+viewCharactersList : SeqDict (Id CharacterId) CharacterSummary -> Html msg
+viewCharactersList characters =
     characters
         |> SeqDict.toList
-        |> List.concatMap viewCharacter
+        |> List.concatMap viewCharacterForList
         |> Html.div
             [ Html.Attributes.style "display" "grid"
             , Html.Attributes.style "grid-template-columns" "40px auto"
@@ -724,8 +726,8 @@ viewCharacters characters =
             ]
 
 
-viewCharacter : ( Id CharacterId, CharacterSummary ) -> List (Html msg)
-viewCharacter ( characterId, { name, icon, color } ) =
+viewCharacterForList : ( Id CharacterId, CharacterSummary ) -> List (Html msg)
+viewCharacterForList ( characterId, { name, icon, color } ) =
     [ case icon of
         Just { url } ->
             Html.a
@@ -778,16 +780,13 @@ viewCharacterNames appData =
             )
 
 
-viewPostTitles : Data -> List (Html msg)
-viewPostTitles appData =
-    appData.posts
+viewPostTitles : Model -> List (Html msg)
+viewPostTitles model =
+    model.posts
         |> SeqDict.values
         |> List.map
-            (\postData ->
+            (\{ post, hasAnnotations } ->
                 let
-                    ( post, _ ) =
-                        postData.post
-
                     cutTitle : String
                     cutTitle =
                         String.Extra.ellipsis 40 post.subject
@@ -809,7 +808,7 @@ viewPostTitles appData =
 
                             Status__Abandoned ->
                                 "💀"
-                      , if postData.hasAnnotations then
+                      , if hasAnnotations then
                             ""
 
                         else
