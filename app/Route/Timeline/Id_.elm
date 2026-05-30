@@ -91,6 +91,7 @@ type alias CharacterSummary =
 type alias Model =
     { posts : SeqDict (Id PostId) PostData
     , mouseState : MouseState
+    , selectedCharacter : Maybe (Id CharacterId)
     }
 
 
@@ -103,6 +104,8 @@ type Msg
     = MouseDown PointerEvent
     | MouseMove PointerEvent
     | MouseUp PointerEvent
+    | MouseEnterCharacter (Id CharacterId)
+    | MouseLeaveCharacter (Id CharacterId)
     | DownloadPositions
 
 
@@ -140,6 +143,7 @@ init : App Data ActionData RouteParams -> Shared.Model -> ( Model, Effect msg )
 init app _ =
     ( { posts = app.data.initialPosts
       , mouseState = MouseNotDragging
+      , selectedCharacter = Nothing
       }
     , Effect.none
     )
@@ -232,6 +236,16 @@ update app _ msg model =
                         |> Codec.encodeToString 0 positionsCodec
                 }
             )
+
+        MouseEnterCharacter id ->
+            ( { model | selectedCharacter = Just id }, Effect.none )
+
+        MouseLeaveCharacter id ->
+            if model.selectedCharacter == Just id then
+                ( { model | selectedCharacter = Nothing }, Effect.none )
+
+            else
+                ( model, Effect.none )
 
 
 pixelsToMeters : PointerEvent -> Quantity Float (Quantity.Rate Meters Pixels)
@@ -567,7 +581,7 @@ view app _ model =
     }
 
 
-viewWordlines : SeqDict (Id CharacterId) CharacterSummary -> List PostData -> List (Html msg)
+viewWordlines : SeqDict (Id CharacterId) CharacterSummary -> List PostData -> List (Html Msg)
 viewWordlines characters posts =
     posts
         |> List.concatMap
@@ -583,12 +597,12 @@ viewWordlines characters posts =
                         Html.text ""
 
                     ( id, _ ) :: _ ->
-                        viewWordline (SeqDict.get id characters) (List.map Tuple.second t)
+                        viewWordline id (SeqDict.get id characters) (List.map Tuple.second t)
             )
 
 
-viewWordline : Maybe CharacterSummary -> List (Point2d Meters {}) -> Html msg
-viewWordline maybeCharacter points =
+viewWordline : Id CharacterId -> Maybe CharacterSummary -> List (Point2d Meters {}) -> Html Msg
+viewWordline id maybeCharacter points =
     let
         path : String
         path =
@@ -629,6 +643,8 @@ viewWordline maybeCharacter points =
         ([ TypedSvg.Attributes.d path
          , TypedSvg.Attributes.fill PaintNone
          , TypedSvg.Attributes.InMeters.strokeWidth (Length.centimeters 1.5)
+         , Html.Events.onMouseEnter (MouseEnterCharacter id)
+         , Html.Events.onMouseLeave (MouseLeaveCharacter id)
          ]
             ++ characterAttrs
         )
@@ -659,8 +675,8 @@ svgViewBoxSize :
     , height : Length
     }
 svgViewBoxSize =
-    { width = Length.meters 4
-    , height = Length.meters 3
+    { width = Length.meters 6
+    , height = Length.meters 6
     }
 
 
@@ -933,7 +949,7 @@ viewPostForList { post, annotations } =
     ]
 
 
-viewCharactersList : SeqDict (Id CharacterId) CharacterSummary -> Html msg
+viewCharactersList : SeqDict (Id CharacterId) CharacterSummary -> Html Msg
 viewCharactersList characters =
     characters
         |> SeqDict.toList
@@ -951,7 +967,7 @@ viewCharactersList characters =
             ]
 
 
-viewCharacterForList : ( Id CharacterId, CharacterSummary ) -> List (Html msg)
+viewCharacterForList : ( Id CharacterId, CharacterSummary ) -> List (Html Msg)
 viewCharacterForList ( characterId, { name, icon, color } ) =
     [ case icon of
         Just { id, url } ->
@@ -960,6 +976,8 @@ viewCharacterForList ( characterId, { name, icon, color } ) =
                 , Html.Attributes.href (GlowficRoute.icon id)
                 , Html.Attributes.title name
                 , Html.Attributes.style "display" "block"
+                , Html.Events.onMouseEnter (MouseEnterCharacter characterId)
+                , Html.Events.onMouseLeave (MouseLeaveCharacter characterId)
                 ]
                 [ Html.img
                     [ Html.Attributes.style "width" "100%"
@@ -980,6 +998,8 @@ viewCharacterForList ( characterId, { name, icon, color } ) =
           else
             Html.Attributes.style "color" "white"
         , Html.Attributes.href (GlowficRoute.character characterId)
+        , Html.Events.onMouseEnter (MouseEnterCharacter characterId)
+        , Html.Events.onMouseLeave (MouseLeaveCharacter characterId)
         ]
         [ Html.text name ]
     ]
