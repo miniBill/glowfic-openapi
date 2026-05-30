@@ -23,6 +23,7 @@ import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 import Html.Events.Extra.Pointer as Pointer
+import Html.Lazy
 import Html.Parser
 import Id exposing (BoardId, CharacterId, IconId, Id, PostId)
 import Json.Decode
@@ -482,7 +483,7 @@ view app _ model =
             , Html.Attributes.style "align-items" "start"
             ]
             [ postsAndPositions app model
-                |> List.concatMap (viewPost model.mouseState)
+                |> List.map (viewPost model.mouseState)
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
                     , Html.Attributes.style "max-width" "100vw"
@@ -492,15 +493,10 @@ view app _ model =
                         svgViewBoxSize.width
                         svgViewBoxSize.height
                     , mouseEventWithSize "pointerdown" MouseDown
-                    , case model.mouseState of
-                        MouseNotDragging ->
-                            Html.Attributes.style "" ""
-
-                        MouseDragging _ _ _ ->
-                            mouseEventWithSize "pointermove" MouseMove
+                    , mouseEventWithSize "pointermove" MouseMove
                     , mouseEventWithSize "pointerup" MouseUp
                     ]
-            , viewCharacters app.data.characters
+            , Html.Lazy.lazy viewCharacters app.data.characters
             ]
         ]
     }
@@ -579,93 +575,102 @@ defaultBoundingBox =
         }
 
 
-viewPost : MouseState -> ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> List (Html Msg)
+viewPost : MouseState -> ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> Html Msg
 viewPost mouseState ( d, boundingBox ) =
     let
         ( post, _ ) =
             d.post
 
-        ( x, y ) =
+        vector : Vector2d Meters {}
+        vector =
             case mouseState of
                 MouseNotDragging ->
-                    ( BoundingBox2d.minX boundingBox, BoundingBox2d.minY boundingBox )
+                    Vector2d.zero
 
                 MouseDragging postId initialPosition draggedPosition ->
                     if postId == post.id then
-                        let
-                            vector : Vector2d Meters {}
-                            vector =
-                                Vector2d.from initialPosition draggedPosition
-
-                            moved : BoundingBox2d Meters {}
-                            moved =
-                                boundingBox |> BoundingBox2d.translateBy vector
-                        in
-                        ( BoundingBox2d.minX moved, BoundingBox2d.minY moved )
+                        Vector2d.from initialPosition draggedPosition
 
                     else
-                        ( BoundingBox2d.minX boundingBox, BoundingBox2d.minY boundingBox )
-
-        ( w, h ) =
-            BoundingBox2d.dimensions boundingBox
-
-        cx : Quantity Float Meters
-        cx =
-            Quantity.plus x (Quantity.half w)
-
-        cy : Quantity Float Meters
-        cy =
-            Quantity.plus y (Quantity.half h)
-
-        lines : List String
-        lines =
-            post.subject
-                |> String.Extra.softWrap 10
-                |> String.lines
-
-        linesCount : Int
-        linesCount =
-            List.length lines
-
-        fontSize : Length
-        fontSize =
-            Length.centimeters 2
+                        Vector2d.zero
     in
-    [ TypedSvg.rect
-        [ TypedSvg.Attributes.InMeters.x x
-        , TypedSvg.Attributes.InMeters.y y
-        , TypedSvg.Attributes.InMeters.width w
-        , TypedSvg.Attributes.InMeters.height h
-        ]
-        []
-    , lines
-        |> List.indexedMap
-            (\i line ->
-                TypedSvg.tspan
-                    [ TypedSvg.Attributes.InMeters.x cx
-                    , TypedSvg.Attributes.InMeters.y
-                        (cy
-                            |> Quantity.plus
-                                (fontSize |> Quantity.multiplyBy (toFloat i - toFloat (linesCount - 1) / 2))
-                        )
+    innerViewPost post vector boundingBox
+
+
+innerViewPost : PostDetails -> Vector2d Meters {} -> BoundingBox2d Meters {} -> Html msg
+innerViewPost =
+    Html.Lazy.lazy3
+        (\post vector boundingBox ->
+            let
+                moved : BoundingBox2d Meters {}
+                moved =
+                    boundingBox |> BoundingBox2d.translateBy vector
+
+                ( x, y ) =
+                    ( BoundingBox2d.minX moved, BoundingBox2d.minY moved )
+
+                ( w, h ) =
+                    BoundingBox2d.dimensions boundingBox
+
+                cx : Quantity Float Meters
+                cx =
+                    Quantity.plus x (Quantity.half w)
+
+                cy : Quantity Float Meters
+                cy =
+                    Quantity.plus y (Quantity.half h)
+
+                lines : List String
+                lines =
+                    post.subject
+                        |> String.Extra.softWrap 10
+                        |> String.lines
+
+                linesCount : Int
+                linesCount =
+                    List.length lines
+
+                fontSize : Length
+                fontSize =
+                    Length.centimeters 2
+            in
+            [ TypedSvg.rect
+                [ TypedSvg.Attributes.InMeters.x x
+                , TypedSvg.Attributes.InMeters.y y
+                , TypedSvg.Attributes.InMeters.width w
+                , TypedSvg.Attributes.InMeters.height h
+                ]
+                []
+            , lines
+                |> List.indexedMap
+                    (\i line ->
+                        TypedSvg.tspan
+                            [ TypedSvg.Attributes.InMeters.x cx
+                            , TypedSvg.Attributes.InMeters.y
+                                (cy
+                                    |> Quantity.plus
+                                        (fontSize |> Quantity.multiplyBy (toFloat i - toFloat (linesCount - 1) / 2))
+                                )
+                            ]
+                            [ TypedSvg.Core.text line ]
+                    )
+                |> TypedSvg.text_
+                    [ TypedSvg.Attributes.fill (Paint Color.white)
+                    , TypedSvg.Attributes.InMeters.fontSize fontSize
+
+                    -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
+                    -- , TypedSvg.Core.attribute "shape-padding" "8px"
+                    , TypedSvg.Attributes.InMeters.x cx
+                    , TypedSvg.Attributes.InMeters.y cy
+                    , TypedSvg.Attributes.dominantBaseline DominantBaselineMiddle
+                    , TypedSvg.Attributes.textAnchor AnchorMiddle
+
+                    -- , TypedSvg.Attributes.InMeters.textLength w
+                    -- , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
                     ]
-                    [ TypedSvg.Core.text line ]
-            )
-        |> TypedSvg.text_
-            [ TypedSvg.Attributes.fill (Paint Color.white)
-            , TypedSvg.Attributes.InMeters.fontSize fontSize
-
-            -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
-            -- , TypedSvg.Core.attribute "shape-padding" "8px"
-            , TypedSvg.Attributes.InMeters.x cx
-            , TypedSvg.Attributes.InMeters.y cy
-            , TypedSvg.Attributes.dominantBaseline DominantBaselineMiddle
-            , TypedSvg.Attributes.textAnchor AnchorMiddle
-
-            -- , TypedSvg.Attributes.InMeters.textLength w
-            -- , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
             ]
-    ]
+                |> TypedSvg.g []
+        )
 
 
 viewCharacters : SeqDict (Id CharacterId) CharacterSummary -> Html msg

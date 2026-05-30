@@ -1,7 +1,7 @@
 {
     "license": "BSD-3-Clause",
     "scripts": {
-        "start": "watchexec -c -w glowfic-openapi.yaml --on-busy-update restart 'bun run gen; bun elm-pages dev --debug --keep-cache'",
+        "start": "watchexec -c -w glowfic-openapi.yaml --on-busy-update restart 'bun run gen; bun elm-pages dev --keep-cache'",
         "build": "bun run gen && elm-pages build",
         "gen": "elm-pages run ./script/src/GenerateOpenApi.elm"
     },
