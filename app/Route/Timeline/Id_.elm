@@ -5,6 +5,7 @@ import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.File as File
 import BoundingBox2d exposing (BoundingBox2d)
+import BoundingBox2d.Extra
 import Codec exposing (Codec)
 import Color
 import Color.Oklch as Oklch exposing (Oklch)
@@ -366,7 +367,10 @@ monad params =
                             , { post = p
                               , replies = r
                               , annotations = ann
-                              , boundingBox = SeqDict.get p.id positions |> Maybe.withDefault (defaultBoundingBox i)
+                              , boundingBox =
+                                    SeqDict.get p.id positions
+                                        |> Maybe.withDefault (defaultBoundingBox i)
+                                        |> resizeBoundingBox p r
                               }
                             )
                         )
@@ -377,6 +381,23 @@ monad params =
     result
         |> Response.render
         |> Monad.succeed
+
+
+resizeBoundingBox : PostDetails -> List Reply -> BoundingBox2d Meters {} -> BoundingBox2d Meters {}
+resizeBoundingBox details replies boundingBox =
+    if List.length details.authors > 8 then
+        BoundingBox2d.withDimensions
+            ( Length.centimeters 12
+            , Length.centimeters 30
+            )
+            (BoundingBox2d.centerPoint boundingBox)
+
+    else
+        BoundingBox2d.withDimensions
+            ( Length.centimeters 12
+            , Length.centimeters 15
+            )
+            (BoundingBox2d.centerPoint boundingBox)
 
 
 positionsData : Id BoardId -> BackendTask FatalError (SeqDict (Id PostId) (BoundingBox2d Meters {}))
@@ -408,7 +429,7 @@ positionCodec =
     boundingBox2dCodec
 
 
-boundingBox2dCodec : Codec (BoundingBox2d unit coordinates)
+boundingBox2dCodec : Codec (BoundingBox2d Meters {})
 boundingBox2dCodec =
     Codec.map
         BoundingBox2d.fromExtrema
@@ -418,7 +439,7 @@ boundingBox2dCodec =
                 { minX = minX
                 , maxX = maxX
                 , minY = minY
-                , maxY = maxY
+                , maxY = maxX
                 }
             )
             |> Codec.field "minX" .minX (quantityCodec Codec.float)
@@ -821,7 +842,7 @@ innerViewPost =
 
                 fontSize : Length
                 fontSize =
-                    Length.centimeters 2
+                    Length.centimeters 2.5
             in
             [ TypedSvg.rect
                 [ TypedSvg.Attributes.InMeters.x x
