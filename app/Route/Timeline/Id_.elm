@@ -143,11 +143,9 @@ update app _ msg model =
                 initialPosition =
                     event.offsetPosition
                         |> Point2d.at (pixelsToMeters event)
-                        |> Debug.log "initialPosition"
             in
             case
                 postsAndPositions app model
-                    |> List.reverse
                     |> List.Extra.findMap
                         (\( { post }, boundingBox ) ->
                             if BoundingBox2d.contains initialPosition boundingBox then
@@ -197,7 +195,7 @@ update app _ msg model =
                                 postId
                                 (\bb ->
                                     bb
-                                        |> Maybe.withDefault defaultBoundingBox
+                                        |> Maybe.withDefault (defaultBoundingBox 0)
                                         |> BoundingBox2d.translateBy vector
                                         |> Just
                                 )
@@ -484,6 +482,7 @@ view app _ model =
             , Html.Attributes.style "align-items" "start"
             ]
             [ postsAndPositions app model
+                |> List.reverse
                 |> List.map (viewPost model.mouseState)
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
@@ -509,7 +508,7 @@ svgViewBoxSize :
     }
 svgViewBoxSize =
     { width = Length.meter
-    , height = Length.meter
+    , height = Length.meters 2
     }
 
 
@@ -563,21 +562,53 @@ postsAndPositions :
             )
 postsAndPositions app model =
     SeqDict.merge
-        (\_ post acc -> ( post, defaultBoundingBox ) :: acc)
-        (\_ post position acc -> ( post, position ) :: acc)
+        (\_ post ( i, acc ) -> ( i + 1, ( post, defaultBoundingBox i ) :: acc ))
+        (\_ post position ( i, acc ) -> ( i, ( post, position ) :: acc ))
         (\_ _ acc -> acc)
         app.data.posts
         model.positions
-        []
+        ( 0, [] )
+        |> Tuple.second
 
 
-defaultBoundingBox : BoundingBox2d Meters {}
-defaultBoundingBox =
+defaultBoundingBox : Int -> BoundingBox2d Meters {}
+defaultBoundingBox i =
+    let
+        columns : Int
+        columns =
+            Quantity.ratio
+                (svgViewBoxSize.width
+                    |> Quantity.plus (Length.centimeters gap)
+                )
+                (Length.centimeters (defaultWidth + gap))
+                |> floor
+                |> max 1
+
+        row : Int
+        row =
+            i // columns
+
+        column : Int
+        column =
+            modBy columns i
+
+        defaultWidth : number
+        defaultWidth =
+            12
+
+        defaultHeight : number
+        defaultHeight =
+            14
+
+        gap : number
+        gap =
+            1
+    in
     BoundingBox2d.fromExtrema
-        { minX = Quantity.zero
-        , minY = Quantity.zero
-        , maxX = Length.centimeters 12
-        , maxY = Length.centimeters 10
+        { minX = Length.centimeters ((defaultWidth + gap) * toFloat column)
+        , minY = Length.centimeters ((defaultHeight + gap) * toFloat row)
+        , maxX = Length.centimeters ((defaultWidth + gap) * toFloat column + defaultWidth)
+        , maxY = Length.centimeters ((defaultHeight + gap) * toFloat row + defaultHeight)
         }
 
 
@@ -629,6 +660,7 @@ innerViewPost =
                 lines : List String
                 lines =
                     post.subject
+                        |> String.Extra.ellipsis 40
                         |> String.Extra.softWrap 10
                         |> String.lines
 
