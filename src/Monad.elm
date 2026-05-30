@@ -1,4 +1,4 @@
-module Monad exposing (Monad, andThen, combine, fail, failString, getRefreshingIf, lift, log, map, map2, run, succeed)
+module Monad exposing (Monad, andThen, combine, fail, failString, fromResult, getRefreshingIf, lift, log, map, map2, run, succeed)
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
@@ -401,3 +401,13 @@ ensureCacheFolderExists =
 
     else
         BackendTask.succeed ()
+
+
+fromResult : Result FatalError a -> Monad a
+fromResult result =
+    case result of
+        Ok o ->
+            succeed o
+
+        Err e ->
+            fail e

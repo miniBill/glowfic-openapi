@@ -106,16 +106,9 @@ update app _ msg model =
             , Effect.saveFile
                 { filename = Glowfic.Utils.postAnnotationsFilename postId
                 , mime = "application/json"
-                , content = Codec.encodeToString 2 annotationsCodec model.annotations
+                , content = Codec.encodeToString 2 Glowfic.Utils.annotationsCodec model.annotations
                 }
             )
-
-
-annotationsCodec : Codec (SeqDict MessageId (List Annotation))
-annotationsCodec =
-    Codec.tuple Annotation.messageIdCodec (Codec.list Annotation.codec)
-        |> Codec.list
-        |> Codec.map SeqDict.fromList SeqDict.toList
 
 
 head : App Data ActionData RouteParams -> List Head.Tag
@@ -160,12 +153,14 @@ monad params =
     <| \postId ->
     Do.do (GlowficApi.Extra.getPost postId) <| \post ->
     Do.do
-        (Monad.lift (readAnnotationsFromFile postId)
+        (Glowfic.Utils.readAnnotationsFromFile postId
+            |> Monad.lift
             |> Monad.andThen
                 (\e ->
                     case e of
                         Nothing ->
-                            calculatePostAnnotations post
+                            Glowfic.Utils.calculatePostAnnotations post
+                                |> Monad.fromResult
 
                         Just o ->
                             Monad.succeed o
@@ -184,38 +179,6 @@ monad params =
             }
     in
     Monad.succeed (Response.render result)
-
-
-readAnnotationsFromFile : Id PostId -> BackendTask FatalError (Maybe (List ( MessageId, Annotation )))
-readAnnotationsFromFile postId =
-    File.rawFile (Glowfic.Utils.postAnnotationsFilepath postId)
-        |> BackendTask.toResult
-        |> BackendTask.andThen
-            (\raw ->
-                case raw of
-                    Err e ->
-                        case e.recoverable of
-                            File.FileDoesntExist ->
-                                BackendTask.succeed Nothing
-
-                            _ ->
-                                BackendTask.fail e.fatal
-
-                    Ok rawString ->
-                        case Codec.decodeString annotationsCodec rawString of
-                            Ok v ->
-                                v
-                                    |> SeqDict.toList
-                                    |> List.concatMap
-                                        (\( messageId, annotations ) ->
-                                            List.map (Tuple.pair messageId) annotations
-                                        )
-                                    |> Just
-                                    |> BackendTask.succeed
-
-                            Err e ->
-                                BackendTask.fail (FatalError.fromString (Json.Decode.errorToString e))
-            )
 
 
 view : App Data ActionData RouteParams -> Shared.Model -> Model -> View (PagesMsg Msg)
@@ -632,106 +595,3 @@ select selectOptions currentValue =
                         |> Maybe.withDefault currentValue
                 )
             ]
-
-
-calculatePostAnnotations : ( PostDetails, List Reply ) -> Monad (List ( MessageId, Annotation ))
-calculatePostAnnotations ( post, replies ) =
-    let
-        result =
-            Result.map2 (\l r -> Rope.appendTo l r |> Rope.toList)
-                (calculatePostDetailsAnnotations post)
-                (Result.map Rope.fromRopeList (Result.Extra.combineMap calculateReplyAnnotations replies))
-    in
-    case result of
-        Ok o ->
-            Monad.succeed o
-
-        Err ( t, e ) ->
-            Monad.failString (Parser.Extra.errorToString t e)
-
-
-calculatePostDetailsAnnotations : PostDetails -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
-calculatePostDetailsAnnotations ({ content } as p) =
-    calculateContentAnnotations (MessageIdPost (Id.for p)) content
-
-
-calculateReplyAnnotations : Reply -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
-calculateReplyAnnotations reply =
-    calculateContentAnnotations (MessageIdReply (Id.for reply)) reply.content
-
-
-calculateContentAnnotations : MessageId -> String -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
-calculateContentAnnotations from content =
-    case Html.Parser.run Html.Parser.noCharRefs content of
-        Err e ->
-            Err ( content, e )
-
-        Ok parsed ->
-            parsed
-                |> Result.Extra.combineMap (calculateNodeLinks from)
-                |> Result.map Rope.fromRopeList
-
-
-calculateNodeLinks : MessageId -> Html.Parser.Node -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
-calculateNodeLinks from node =
-    case node of
-        Html.Parser.Element "a" attrs children ->
-            case List.Extra.find (\( attrName, _ ) -> attrName == "href") attrs of
-                Just ( _, target ) ->
-                    case Parser.run targetParser target of
-                        Err e ->
-                            Err ( target, e )
-
-                        Ok Nothing ->
-                            Ok Rope.empty
-
-                        Ok (Just to) ->
-                            Ok (Rope.singleton ( from, HappensAfter to ))
-
-                Nothing ->
-                    children
-                        |> Result.Extra.combineMap (calculateNodeLinks from)
-                        |> Result.map Rope.fromRopeList
-
-        Html.Parser.Element _ _ children ->
-            children
-                |> Result.Extra.combineMap (calculateNodeLinks from)
-                |> Result.map Rope.fromRopeList
-
-        Html.Parser.Text _ ->
-            Ok Rope.empty
-
-        Html.Parser.Comment _ ->
-            Ok Rope.empty
-
-
-targetParser : Parser (Maybe MessageId)
-targetParser =
-    Parser.oneOf
-        [ Parser.succeed (\reply -> Just (MessageIdReply (Id.unsafe reply)))
-            |. Parser.oneOf
-                [ Parser.token "/replies/"
-                , Parser.token "https://glowfic.com/replies/"
-                , Parser.token "https://www.glowfic.com/replies/"
-                ]
-            |= Parser.int
-            |. Parser.token "#reply-"
-            |. Parser.int
-        , Parser.succeed (\post -> Just (MessageIdPost (Id.unsafe post)))
-            |. Parser.oneOf
-                [ Parser.token "/posts/"
-                , Parser.token "https://glowfic.com/posts/"
-                , Parser.token "https://www.glowfic.com/posts/"
-                ]
-            |= Parser.int
-        , Parser.succeed Nothing
-            |. Parser.oneOf
-                [ Parser.token "https://en.wikipedia.org/"
-                , Parser.token "https://www.aonprd.com/"
-                , Parser.token "https://www.d20pfsrd.com/"
-                , Parser.token "http://www.chinese-poems.com/"
-                , Parser.token "https://www.willowandroxas.com/"
-                ]
-            |. Parser.chompWhile (\_ -> True)
-        ]
-        |. Parser.end

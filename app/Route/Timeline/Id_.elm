@@ -1,5 +1,6 @@
 module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, MouseState, Msg, RouteParams, route)
 
+import Annotation exposing (Annotation, MessageId)
 import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.File as File
@@ -70,7 +71,7 @@ type alias Data =
 type alias PostData =
     { post : PostDetails
     , replies : List Reply
-    , hasAnnotations : Bool
+    , annotations : List ( MessageId, Annotation )
     , boundingBox : BoundingBox2d Meters {}
     }
 
@@ -265,7 +266,10 @@ monad params =
         (\post ->
             Monad.map2 Tuple.pair
                 (GlowficApi.Extra.getPost post.id)
-                (Monad.lift (File.exists (Glowfic.Utils.postAnnotationsFilepath post.id)))
+                (Glowfic.Utils.readAnnotationsFromFile post.id
+                    |> Monad.lift
+                    |> Monad.map (Maybe.withDefault [])
+                )
         )
     <| \posts ->
     Do.do (Monad.lift (positionsData board.id)) <| \positions ->
@@ -324,7 +328,7 @@ monad params =
                             ( Id.for p
                             , { post = p
                               , replies = r
-                              , hasAnnotations = ann
+                              , annotations = ann
                               , boundingBox = SeqDict.get p.id positions |> Maybe.withDefault (defaultBoundingBox i)
                               }
                             )
@@ -488,10 +492,10 @@ view app _ model =
             , Html.Attributes.style "align-items" "start"
             ]
             [ let
-                postsList : List ( Id PostId, PostData )
+                postsList : List PostData
                 postsList =
                     model.posts
-                        |> SeqDict.toList
+                        |> SeqDict.values
                         |> List.reverse
 
                 postsViews : List (Html Msg)
@@ -521,9 +525,13 @@ view app _ model =
     }
 
 
-viewCharacters : List ( Id PostId, PostData ) -> List (Html msg)
+viewCharacters : List PostData -> List (Html msg)
 viewCharacters posts =
-    []
+    posts
+        |> List.indexedMap
+            (\i _ ->
+                Html.text "TODO"
+            )
 
 
 svgViewBoxSize :
@@ -617,8 +625,8 @@ defaultBoundingBox i =
         }
 
 
-viewPost : MouseState -> ( id, PostData ) -> Html Msg
-viewPost mouseState ( _, postData ) =
+viewPost : MouseState -> PostData -> Html Msg
+viewPost mouseState postData =
     let
         vector : Vector2d Meters {}
         vector =
@@ -785,7 +793,7 @@ viewPostTitles model =
     model.posts
         |> SeqDict.values
         |> List.map
-            (\{ post, hasAnnotations } ->
+            (\{ post, annotations } ->
                 let
                     cutTitle : String
                     cutTitle =
@@ -808,11 +816,11 @@ viewPostTitles model =
 
                             Status__Abandoned ->
                                 "💀"
-                      , if hasAnnotations then
-                            ""
+                      , if List.isEmpty annotations then
+                            "⚠️"
 
                         else
-                            "⚠️"
+                            ""
                       , cutTitle
                       ]
                         |> List.Extra.removeWhen String.isEmpty
