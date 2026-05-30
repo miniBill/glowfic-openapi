@@ -1,4 +1,4 @@
-module Annotation exposing (Annotation(..), MessageId(..), codec, messageIdCodec, messageIdToString)
+module Annotation exposing (Annotation(..), MessageId(..), codec, messageIdCodec)
 
 import Codec exposing (Codec)
 import Id exposing (CharacterId, Id, PostId, ReplyId)

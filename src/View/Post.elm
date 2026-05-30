@@ -1,4 +1,4 @@
-module View.Post exposing (viewHeader, viewReply, viewThread, viewTopPost)
+module View.Post exposing (viewHeader, viewReply, viewTopPost)
 
 import GlowficApi.Types exposing (Character, Icon, PostDetails, Reply, User)
 import GlowficRoute

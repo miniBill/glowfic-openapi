@@ -12,7 +12,6 @@ import Html.Parser
 import Id exposing (Id, PostId)
 import List.Extra
 import Monad exposing (Monad)
-import OpenApi.Common
 import Pages.Url
 import RouteBuilder exposing (App, StatelessRoute)
 import SeqDict exposing (SeqDict)

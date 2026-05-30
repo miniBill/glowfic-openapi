@@ -1,4 +1,4 @@
-module Glowfic.Utils exposing (allCharactersIds, boardAnnotationsFilename, boardAnnotationsFilepath, postAnnotationsFilename, postAnnotationsFilepath)
+module Glowfic.Utils exposing (allCharactersIds, boardAnnotationsFilepath, postAnnotationsFilename, postAnnotationsFilepath)
 
 import GlowficApi.Types exposing (PostDetails, Reply)
 import Id exposing (BoardId, CharacterId, Id, PostId)

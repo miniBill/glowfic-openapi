@@ -1,5 +1,11 @@
 {
-    "cSpell.words": ["screenname", "Subcontinuities"],
+    "cSpell.words": [
+        "pointerdown",
+        "pointermove",
+        "pointerup",
+        "screenname",
+        "Subcontinuities"
+    ],
     "elmLS.elmFormatPath": "elm-format-hack",
     "elmLS.elmPath": "node_modules/.bin/lamdera"
 }

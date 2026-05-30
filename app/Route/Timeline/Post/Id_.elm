@@ -18,7 +18,6 @@ import Html.Events
 import Html.Parser
 import Id exposing (CharacterId, Id, PostId, ReplyId)
 import Json.Decode
-import Json.Encode
 import List.Extra
 import Maybe.Extra
 import Monad exposing (Monad)
@@ -314,14 +313,18 @@ viewThread model ( post, replies ) =
             :: View.Post.viewTopPost [] post
             :: viewAnnotations [] model characters post.character afterTopPost (MessageIdPost post.id)
             :: List.concat (List.map2 viewReply replies messageData)
-            ++ (if post.status == GlowficApi.Types.Status__Complete then
-                    [ Html.div
-                        [ Html.Attributes.style "grid-column" "1 / span 2" ]
-                        [ Html.text "Complete" ]
-                    ]
+            ++ (case post.status of
+                    GlowficApi.Types.Status__Complete ->
+                        [ Html.div
+                            [ Html.Attributes.style "grid-column" "1 / span 2" ]
+                            [ Html.text "Complete" ]
+                        ]
 
-                else
-                    []
+                    GlowficApi.Types.Status__Abandoned ->
+                        []
+
+                    GlowficApi.Types.Status__Active ->
+                        []
                )
             ++ (if SeqSet.isEmpty finalState.onStage then
                     []
@@ -590,7 +593,10 @@ viewAnnotation characters annotation =
             Exit _ ->
                 characterSelect Exit
 
-            _ ->
+            HappensBefore _ ->
+                Html.text ""
+
+            HappensAfter _ ->
                 Html.text ""
         , Html.input
             [ Html.Events.onInput changeId
@@ -634,7 +640,7 @@ calculatePostAnnotations ( post, replies ) =
         result =
             Result.map2 (\l r -> Rope.appendTo l r |> Rope.toList)
                 (calculatePostDetailsAnnotations post)
-                (Result.map Rope.fromRopeList (Result.Extra.combineMap (calculateReplyAnnotations post) replies))
+                (Result.map Rope.fromRopeList (Result.Extra.combineMap calculateReplyAnnotations replies))
     in
     case result of
         Ok o ->
@@ -649,8 +655,8 @@ calculatePostDetailsAnnotations ({ content } as p) =
     calculateContentAnnotations (MessageIdPost (Id.for p)) content
 
 
-calculateReplyAnnotations : PostDetails -> Reply -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
-calculateReplyAnnotations post reply =
+calculateReplyAnnotations : Reply -> Result ( String, List Parser.DeadEnd ) (Rope ( MessageId, Annotation ))
+calculateReplyAnnotations reply =
     calculateContentAnnotations (MessageIdReply (Id.for reply)) reply.content
 
 
@@ -672,7 +678,7 @@ calculateNodeLinks from node =
         Html.Parser.Element "a" attrs children ->
             case List.Extra.find (\( attrName, _ ) -> attrName == "href") attrs of
                 Just ( _, target ) ->
-                    case Parser.run (targetParser from) target of
+                    case Parser.run targetParser target of
                         Err e ->
                             Err ( target, e )
 
@@ -699,8 +705,8 @@ calculateNodeLinks from node =
             Ok Rope.empty
 
 
-targetParser : MessageId -> Parser (Maybe MessageId)
-targetParser from =
+targetParser : Parser (Maybe MessageId)
+targetParser =
     Parser.oneOf
         [ Parser.succeed (\reply -> Just (MessageIdReply (Id.unsafe reply)))
             |. Parser.oneOf

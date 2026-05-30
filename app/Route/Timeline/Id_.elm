@@ -1,4 +1,4 @@
-module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, Msg, RouteParams, route)
+module Route.Timeline.Id_ exposing (ActionData, CharacterSummary, Data, Model, MouseState, Msg, Position, RouteParams, route)
 
 import Ansi.Color
 import BackendTask exposing (BackendTask)
@@ -17,11 +17,15 @@ import GlowficApi.Types exposing (PostDetails, PostSummary, Reply, Status(..))
 import GlowficRoute
 import Head
 import Head.Seo as Seo
-import Html exposing (Attribute, Html)
+import Html exposing (Html)
 import Html.Attributes
+import Html.Events
+import Html.Events.Extra.Mouse as Mouse
 import Html.Events.Extra.Pointer as Pointer
 import Html.Parser
 import Id exposing (BoardId, CharacterId, IconId, Id, PostId)
+import Json.Decode
+import Length exposing (Length, Meters)
 import List.Extra
 import Maybe.Extra
 import Monad exposing (Monad)
@@ -33,36 +37,25 @@ import Pixels exposing (Pixels)
 import Point2d exposing (Point2d)
 import Quantity exposing (Quantity)
 import Route
-import RouteBuilder exposing (App, StatefulRoute, StatelessRoute)
+import RouteBuilder exposing (App, StatefulRoute)
 import SeqDict exposing (SeqDict)
-import SeqDict.Extra
 import SeqSet exposing (SeqSet)
 import Server.Response as Response exposing (Response)
 import Shared
 import String.Extra
 import TypedSvg
 import TypedSvg.Attributes
-import TypedSvg.Attributes.InPixels
-import TypedSvg.Attributes.InPx
+import TypedSvg.Attributes.InMeters
 import TypedSvg.Core
-import TypedSvg.Events
-import TypedSvg.Types exposing (AlignmentBaseline(..), AnchorAlignment(..), DominantBaseline(..), LengthAdjust(..), Paint(..))
+import TypedSvg.Types exposing (DominantBaseline(..), LengthAdjust(..), Paint(..))
 import Url exposing (Url)
-import UrlPath
+import UrlPath exposing (UrlPath)
 import Vector2d exposing (Vector2d)
 import View exposing (View)
 
 
 type alias ActionData =
     Never
-
-
-type WorldCoordinates
-    = WorldCoordinates
-
-
-type ElementCoordinates
-    = ElementCoordinates
 
 
 type alias Data =
@@ -74,7 +67,7 @@ type alias Data =
 
 
 type alias Position =
-    BoundingBox2d Pixels WorldCoordinates
+    BoundingBox2d Meters {}
 
 
 type alias CharacterSummary =
@@ -92,13 +85,19 @@ type alias Model =
 
 type MouseState
     = MouseNotDragging
-    | MouseDragging (Id PostId) (Point2d Pixels ElementCoordinates) (Point2d Pixels ElementCoordinates)
+    | MouseDragging (Id PostId) (Point2d Meters {}) (Point2d Meters {})
 
 
 type Msg
-    = MouseDown (Id PostId) Pointer.Event
-    | MouseMove Pointer.Event
-    | MouseUp
+    = MouseDown PointerEvent
+    | MouseMove PointerEvent
+    | MouseUp PointerEvent
+
+
+type alias PointerEvent =
+    { offsetPosition : Point2d Pixels {}
+    , elementSize : { width : Quantity Float Pixels, height : Quantity Float Pixels }
+    }
 
 
 type alias RouteParams =
@@ -125,7 +124,7 @@ route =
 
 
 init : App Data ActionData RouteParams -> Shared.Model -> ( Model, Effect msg )
-init app model =
+init app _ =
     ( { positions = app.data.initialPositions
       , mouseState = MouseNotDragging
       }
@@ -134,66 +133,78 @@ init app model =
 
 
 update : App Data ActionData RouteParams -> Shared.Model -> Msg -> Model -> ( Model, Effect msg )
-update arg1 arg2 msg model =
+update app _ msg model =
     case msg of
-        MouseDown postId event ->
+        MouseDown event ->
             let
-                position : Point2d Pixels ElementCoordinates
-                position =
-                    event.pointer.offsetPos
-                        |> Point2d.fromTuple Pixels.pixels
+                initialPosition : Point2d Meters {}
+                initialPosition =
+                    event.offsetPosition
+                        |> Point2d.at (pixelsToMeters event)
             in
-            ( { model | mouseState = MouseDragging postId position position }, Effect.none )
+            case
+                postsAndPositions app model
+                    |> List.Extra.findMap
+                        (\( { post }, boundingBox ) ->
+                            if BoundingBox2d.contains initialPosition boundingBox then
+                                Just (Tuple.first post).id
+
+                            else
+                                Nothing
+                        )
+            of
+                Nothing ->
+                    ( model, Effect.none )
+
+                Just postId ->
+                    ( { model | mouseState = MouseDragging postId initialPosition initialPosition }, Effect.none )
 
         MouseMove event ->
-            let
-                position : Point2d Pixels ElementCoordinates
-                position =
-                    event.pointer.offsetPos
-                        |> Point2d.fromTuple Pixels.pixels
-            in
             ( case model.mouseState of
                 MouseNotDragging ->
                     model
 
                 MouseDragging postId initialPosition _ ->
+                    let
+                        position : Point2d Meters {}
+                        position =
+                            event.offsetPosition
+                                |> Point2d.at (pixelsToMeters event)
+                    in
                     { model | mouseState = MouseDragging postId initialPosition position }
             , Effect.none
             )
 
-        MouseUp ->
+        MouseUp event ->
             ( case model.mouseState of
                 MouseNotDragging ->
                     model
 
                 MouseDragging postId initialPosition draggedPosition ->
                     let
-                        vector : Vector2d Pixels ElementCoordinates
+                        vector : Vector2d Meters {}
                         vector =
                             Vector2d.from initialPosition draggedPosition
-
-                        frame : Frame2d Pixels coordinates defines
-                        frame =
-                            Frame2d.atOrigin
-
-                        diff : Vector2d Pixels WorldCoordinates
-                        diff =
-                            Vector2d.relativeTo frame vector
                     in
                     { model
                         | mouseState = MouseNotDragging
                         , positions =
                             SeqDict.updateIfExists
                                 postId
-                                (BoundingBox2d.translateBy diff)
+                                (BoundingBox2d.translateBy vector)
                                 model.positions
                     }
             , Effect.none
             )
 
 
-subscriptions : RouteParams -> UrlPath.UrlPath -> Shared.Model -> Model -> Sub msg
-subscriptions arg1 arg2 arg3 arg4 =
+pixelsToMeters : PointerEvent -> Quantity Float (Quantity.Rate Meters Pixels)
+pixelsToMeters event =
+    Debug.todo "TODO"
+
+
+subscriptions : RouteParams -> UrlPath -> Shared.Model -> Model -> Sub msg
+subscriptions _ _ _ _ =
     Sub.none
 
 
@@ -321,7 +332,10 @@ positionsData boardId =
                     File.FileDoesntExist ->
                         BackendTask.succeed SeqDict.empty
 
-                    _ ->
+                    File.FileReadError _ ->
+                        BackendTask.fail e.fatal
+
+                    File.DecodingError _ ->
                         BackendTask.fail e.fatal
             )
 
@@ -450,17 +464,6 @@ view : App Data ActionData RouteParams -> Shared.Model -> Model -> View Msg
 view app _ model =
     { title = app.data.name
     , body =
-        let
-            columns : List String
-            columns =
-                SeqDict.keys app.data.characters
-                    |> List.map (\id -> "[c" ++ Id.toString id ++ "-start] auto")
-
-            rows : List String
-            rows =
-                SeqDict.keys app.data.posts
-                    |> List.map (\id -> "[p" ++ Id.toString id ++ "-start] auto")
-        in
         [ Html.div
             [ Html.Attributes.style "display" "flex"
             , Html.Attributes.style "color" "#f3f3f3"
@@ -469,28 +472,19 @@ view app _ model =
             , Html.Attributes.style "padding" "8px"
             , Html.Attributes.style "align-items" "start"
             ]
-            [ SeqDict.merge
-                (\_ post acc ->
-                    ( post
-                    , BoundingBox2d.fromExtrema
-                        { minX = Quantity.zero
-                        , minY = Quantity.zero
-                        , maxX = Pixels.pixels 100
-                        , maxY = Pixels.pixels 100
-                        }
-                    )
-                        :: acc
-                )
-                (\_ post position acc -> ( post, position ) :: acc)
-                (\_ _ acc -> acc)
-                app.data.posts
-                model.positions
-                []
-                |> List.concatMap viewPost
+            [ postsAndPositions app model
+                |> List.concatMap (viewPost model.mouseState)
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
                     , Html.Attributes.style "max-width" "100vw"
-                    , TypedSvg.Attributes.viewBox 0 0 800 800
+                    , TypedSvg.Attributes.InMeters.viewBox
+                        Quantity.zero
+                        Quantity.zero
+                        svgViewBoxSize.width
+                        svgViewBoxSize.height
+                    , mouseEventWithSize "pointerdown" MouseDown
+                    , mouseEventWithSize "pointermove" MouseMove
+                    , mouseEventWithSize "pointerup" MouseUp
                     ]
             , viewCharacters app.data.characters
             ]
@@ -498,11 +492,105 @@ view app _ model =
     }
 
 
-viewPost : ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> List (Html Msg)
-viewPost ( d, boundingBox ) =
+svgViewBoxSize :
+    { width : Length
+    , height : Length
+    }
+svgViewBoxSize =
+    { width = Length.meter
+    , height = Length.meter
+    }
+
+
+mouseEventWithSize : String -> (PointerEvent -> msg) -> Html.Attribute msg
+mouseEventWithSize name tag =
+    eventDecoder
+        |> Json.Decode.map
+            (\ev ->
+                { message = tag ev
+                , stopPropagation = False
+                , preventDefault = True
+                }
+            )
+        |> Html.Events.custom name
+
+
+eventDecoder : Json.Decode.Decoder PointerEvent
+eventDecoder =
+    let
+        pixels : Json.Decode.Decoder (Quantity Float Pixels)
+        pixels =
+            Json.Decode.map Pixels.pixels Json.Decode.float
+    in
+    Json.Decode.map4
+        (\x y width height ->
+            { offsetPosition = Point2d.xy x y
+            , elementSize =
+                { width = width
+                , height = height
+                }
+            }
+        )
+        (Json.Decode.field "offsetX" pixels)
+        (Json.Decode.field "offsetY" pixels)
+        (Json.Decode.at [ "currentTarget", "clientWidth" ] pixels)
+        (Json.Decode.at [ "currentTarget", "clientHeight" ] pixels)
+
+
+postsAndPositions :
+    App Data ActionData RouteParams
+    -> Model
+    ->
+        List
+            ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }
+            , BoundingBox2d Meters {}
+            )
+postsAndPositions app model =
+    SeqDict.merge
+        (\_ post acc ->
+            ( post
+            , BoundingBox2d.fromExtrema
+                { minX = Quantity.zero
+                , minY = Quantity.zero
+                , maxX = Length.centimeters 10
+                , maxY = Length.centimeters 10
+                }
+            )
+                :: acc
+        )
+        (\_ post position acc -> ( post, position ) :: acc)
+        (\_ _ acc -> acc)
+        app.data.posts
+        model.positions
+        []
+
+
+viewPost : MouseState -> ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> List (Html Msg)
+viewPost mouseState ( d, boundingBox ) =
     let
         ( post, _ ) =
             d.post
+
+        ( x, y ) =
+            case mouseState of
+                MouseNotDragging ->
+                    ( BoundingBox2d.minX boundingBox, BoundingBox2d.minY boundingBox )
+
+                MouseDragging postId initialPosition draggedPosition ->
+                    if postId == post.id then
+                        let
+                            vector : Vector2d Meters {}
+                            vector =
+                                Vector2d.from initialPosition draggedPosition
+
+                            moved : BoundingBox2d Meters {}
+                            moved =
+                                boundingBox |> BoundingBox2d.translateBy vector
+                        in
+                        ( BoundingBox2d.minX moved, BoundingBox2d.minY moved )
+
+                    else
+                        ( BoundingBox2d.minX boundingBox, BoundingBox2d.minY boundingBox )
 
         ( w, h ) =
             BoundingBox2d.dimensions boundingBox
@@ -510,39 +598,28 @@ viewPost ( d, boundingBox ) =
         id : String
         id =
             "p" ++ Id.toString post.id
-
-        clickAttrs : List (Attribute Msg)
-        clickAttrs =
-            [ Pointer.onDown (MouseDown post.id)
-            , Pointer.onMove MouseMove
-            , Pointer.onUp (always MouseUp)
-            ]
     in
     [ TypedSvg.rect
-        ([ TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
-         , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
-         , TypedSvg.Attributes.InPixels.width w
-         , TypedSvg.Attributes.InPixels.height h
-         , TypedSvg.Attributes.id id
-         ]
-            ++ clickAttrs
-        )
+        [ TypedSvg.Attributes.InMeters.x x
+        , TypedSvg.Attributes.InMeters.y y
+        , TypedSvg.Attributes.InMeters.width w
+        , TypedSvg.Attributes.InMeters.height h
+        , TypedSvg.Attributes.id id
+        ]
         []
     , TypedSvg.text_
-        ([ TypedSvg.Attributes.dominantBaseline DominantBaselineHanging
-         , TypedSvg.Attributes.fill (Paint Color.white)
+        [ TypedSvg.Attributes.dominantBaseline DominantBaselineHanging
+        , TypedSvg.Attributes.fill (Paint Color.white)
 
-         -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
-         -- , TypedSvg.Core.attribute "shape-padding" "8px"
-         , TypedSvg.Attributes.InPixels.x (BoundingBox2d.minX boundingBox)
-         , TypedSvg.Attributes.InPixels.y (BoundingBox2d.minY boundingBox)
+        -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
+        -- , TypedSvg.Core.attribute "shape-padding" "8px"
+        , TypedSvg.Attributes.InMeters.x x
+        , TypedSvg.Attributes.InMeters.y y
 
-         -- , TypedSvg.Attributes.textAnchor AnchorMiddle
-         , TypedSvg.Attributes.InPixels.textLength w
-         , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
-         ]
-            ++ clickAttrs
-        )
+        -- , TypedSvg.Attributes.textAnchor AnchorMiddle
+        , TypedSvg.Attributes.InMeters.textLength w
+        , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
+        ]
         [ TypedSvg.Core.text post.subject ]
     ]
 

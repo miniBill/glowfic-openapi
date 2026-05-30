@@ -112,7 +112,7 @@ config =
     , Validate.Regexes.rule
     , VariablesBetweenCaseOf.AccessInCases.forbid
     ]
-        |> List.map (Rule.ignoreErrorsForDirectories [ "generated", ".elm-pages" ])
+        |> List.map (Rule.ignoreErrorsForDirectories [ "generated", ".elm-pages", "vendored" ])
 
 
 pipelineConfig : List (ReviewPipelineStyles.PipelineRule ())
