@@ -19,7 +19,7 @@ import GlowficApi.Types exposing (PostDetails, PostSummary, Reply, Status(..))
 import GlowficRoute
 import Head
 import Head.Seo as Seo
-import Html exposing (Html)
+import Html exposing (Attribute, Html)
 import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
@@ -559,7 +559,7 @@ view app model =
                     [ Html.Attributes.style "max-height" "calc(100dvh - 80px)"
                     , Html.Attributes.style "display" "flex"
                     ]
-            , Html.Lazy.lazy viewCharactersList app.data.characters
+            , Html.Lazy.lazy2 viewCharactersList model.selectedCharacter app.data.characters
             , Html.div [ Html.Attributes.style "padding" "8px 0" ]
                 [ Html.button
                     [ Html.Events.onClick DownloadPositions
@@ -587,20 +587,10 @@ viewWordlines characters selected posts =
                         Nothing
 
                     ( id, _ ) :: _ ->
-                        let
-                            sortKey : Int
-                            sortKey =
-                                if Just id == selected then
-                                    1
-
-                                else
-                                    0
-                        in
-                        Just ( sortKey, id, List.map Tuple.second t )
+                        Just ( id, List.map Tuple.second t )
             )
-        |> List.sortBy (\( k1, _, _ ) -> k1)
         |> List.map
-            (\( _, id, t ) ->
+            (\( id, t ) ->
                 viewWordline selected id (SeqDict.get id characters) t
             )
 
@@ -655,6 +645,7 @@ viewWordline selected id maybeCharacter points =
 
            else
             TypedSvg.Core.attribute "stroke" "#ffffff20"
+         , Html.Attributes.style "animate" "stroke 0.5s"
          ]
             ++ characterAttrs
         )
@@ -959,11 +950,11 @@ viewPostForList { post, annotations } =
     ]
 
 
-viewCharactersList : SeqDict (Id CharacterId) CharacterSummary -> Html Msg
-viewCharactersList characters =
+viewCharactersList : Maybe (Id CharacterId) -> SeqDict (Id CharacterId) CharacterSummary -> Html Msg
+viewCharactersList selected characters =
     characters
         |> SeqDict.toList
-        |> List.concatMap viewCharacterForList
+        |> List.concatMap (viewCharacterForList selected)
         |> Html.div
             [ Html.Attributes.style "display" "grid"
             , Html.Attributes.style "grid-template-columns" "40px auto"
@@ -977,18 +968,31 @@ viewCharactersList characters =
             ]
 
 
-viewCharacterForList : ( Id CharacterId, CharacterSummary ) -> List (Html Msg)
-viewCharacterForList ( characterId, { name, icon, color } ) =
+viewCharacterForList : Maybe (Id CharacterId) -> ( Id CharacterId, CharacterSummary ) -> List (Html Msg)
+viewCharacterForList selected ( characterId, { name, icon, color } ) =
+    let
+        common : List (Attribute Msg)
+        common =
+            [ if selected == Just characterId || selected == Nothing then
+                Html.Attributes.style "opacity" "1"
+
+              else
+                Html.Attributes.style "opacity" "0.7"
+            , Html.Attributes.style "transition" "opacity 0.5s"
+            , Html.Attributes.style "display" "block"
+            , Html.Events.onMouseEnter (MouseEnterCharacter characterId)
+            , Html.Events.onMouseLeave (MouseLeaveCharacter characterId)
+            ]
+    in
     [ case icon of
         Just { id, url } ->
             Html.a
-                [ Html.Attributes.class "icon"
-                , Html.Attributes.href (GlowficRoute.icon id)
-                , Html.Attributes.title name
-                , Html.Attributes.style "display" "block"
-                , Html.Events.onMouseEnter (MouseEnterCharacter characterId)
-                , Html.Events.onMouseLeave (MouseLeaveCharacter characterId)
-                ]
+                ([ Html.Attributes.class "icon"
+                 , Html.Attributes.href (GlowficRoute.icon id)
+                 , Html.Attributes.title name
+                 ]
+                    ++ common
+                )
                 [ Html.img
                     [ Html.Attributes.style "width" "100%"
                     , Html.Attributes.style "height" "auto"
@@ -1000,17 +1004,16 @@ viewCharacterForList ( characterId, { name, icon, color } ) =
         Nothing ->
             Html.div [] []
     , Html.a
-        [ Html.Attributes.style "background" (Oklch.toCssString color)
-        , Html.Attributes.style "display" "block"
-        , if color.lightness > 0.5 then
+        ([ Html.Attributes.style "background" (Oklch.toCssString color)
+         , if color.lightness > 0.5 then
             Html.Attributes.style "color" "black"
 
-          else
+           else
             Html.Attributes.style "color" "white"
-        , Html.Attributes.href (GlowficRoute.character characterId)
-        , Html.Events.onMouseEnter (MouseEnterCharacter characterId)
-        , Html.Events.onMouseLeave (MouseLeaveCharacter characterId)
-        ]
+         , Html.Attributes.href (GlowficRoute.character characterId)
+         ]
+            ++ common
+        )
         [ Html.text name ]
     ]
 
