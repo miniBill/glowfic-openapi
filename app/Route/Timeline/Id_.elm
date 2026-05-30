@@ -580,14 +580,28 @@ viewWordlines characters selected posts =
             )
         |> Dict.Extra.groupBy (\( characterId, _ ) -> Id.toInt characterId)
         |> Dict.values
-        |> List.map
+        |> List.filterMap
             (\t ->
                 case t of
                     [] ->
-                        Html.text ""
+                        Nothing
 
                     ( id, _ ) :: _ ->
-                        viewWordline selected id (SeqDict.get id characters) (List.map Tuple.second t)
+                        let
+                            sortKey : Int
+                            sortKey =
+                                if Just id == selected then
+                                    1
+
+                                else
+                                    0
+                        in
+                        Just ( sortKey, id, List.map Tuple.second t )
+            )
+        |> List.sortBy (\( k1, _, _ ) -> k1)
+        |> List.map
+            (\( _, id, t ) ->
+                viewWordline selected id (SeqDict.get id characters) t
             )
 
 
