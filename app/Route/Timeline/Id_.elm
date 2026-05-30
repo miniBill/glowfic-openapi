@@ -189,9 +189,14 @@ update app _ msg model =
                     { model
                         | mouseState = MouseNotDragging
                         , positions =
-                            SeqDict.updateIfExists
+                            SeqDict.update
                                 postId
-                                (BoundingBox2d.translateBy vector)
+                                (\bb ->
+                                    bb
+                                        |> Maybe.withDefault defaultBoundingBox
+                                        |> BoundingBox2d.translateBy vector
+                                        |> Just
+                                )
                                 model.positions
                     }
             , Effect.none
@@ -200,7 +205,9 @@ update app _ msg model =
 
 pixelsToMeters : PointerEvent -> Quantity Float (Quantity.Rate Meters Pixels)
 pixelsToMeters event =
-    Debug.todo "TODO"
+    Quantity.min
+        (svgViewBoxSize.width |> Quantity.per event.elementSize.width)
+        (svgViewBoxSize.height |> Quantity.per event.elementSize.height)
 
 
 subscriptions : RouteParams -> UrlPath -> Shared.Model -> Model -> Sub msg
@@ -483,7 +490,12 @@ view app _ model =
                         svgViewBoxSize.width
                         svgViewBoxSize.height
                     , mouseEventWithSize "pointerdown" MouseDown
-                    , mouseEventWithSize "pointermove" MouseMove
+                    , case model.mouseState of
+                        MouseNotDragging ->
+                            Html.Attributes.style "" ""
+
+                        MouseDragging _ _ _ ->
+                            mouseEventWithSize "pointermove" MouseMove
                     , mouseEventWithSize "pointerup" MouseUp
                     ]
             , viewCharacters app.data.characters
@@ -547,22 +559,22 @@ postsAndPositions :
             )
 postsAndPositions app model =
     SeqDict.merge
-        (\_ post acc ->
-            ( post
-            , BoundingBox2d.fromExtrema
-                { minX = Quantity.zero
-                , minY = Quantity.zero
-                , maxX = Length.centimeters 10
-                , maxY = Length.centimeters 10
-                }
-            )
-                :: acc
-        )
+        (\_ post acc -> ( post, defaultBoundingBox ) :: acc)
         (\_ post position acc -> ( post, position ) :: acc)
         (\_ _ acc -> acc)
         app.data.posts
         model.positions
         []
+
+
+defaultBoundingBox : BoundingBox2d Meters {}
+defaultBoundingBox =
+    BoundingBox2d.fromExtrema
+        { minX = Quantity.zero
+        , minY = Quantity.zero
+        , maxX = Length.centimeters 10
+        , maxY = Length.centimeters 10
+        }
 
 
 viewPost : MouseState -> ( { post : ( PostDetails, List Reply ), hasAnnotations : Bool }, Position ) -> List (Html Msg)
