@@ -1,4 +1,4 @@
-module TypedSvg.Attributes.InMeters exposing (dx, dy, fontSize, height, textLength, viewBox, width, x, y)
+module TypedSvg.Attributes.InMeters exposing (dx, dy, fontSize, height, strokeWidth, textLength, viewBox, width, x, y)
 
 import Length exposing (Length)
 import TypedSvg.Attributes
@@ -53,3 +53,8 @@ dy v =
 fontSize : Length -> Attribute msg
 fontSize v =
     TypedSvg.Attributes.fontSize (TypedSvg.Types.Num (Length.inCentimeters v))
+
+
+strokeWidth : Length -> Attribute msg
+strokeWidth v =
+    TypedSvg.Attributes.strokeWidth (TypedSvg.Types.Num (Length.inCentimeters v))

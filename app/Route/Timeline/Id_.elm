@@ -41,6 +41,7 @@ import PagesMsg
 import Pixels exposing (Pixels)
 import Point2d exposing (Point2d)
 import Quantity exposing (Quantity)
+import Round
 import Route
 import RouteBuilder exposing (App, StatefulRoute)
 import SeqDict exposing (SeqDict)
@@ -511,17 +512,11 @@ view app _ model =
                     model.posts
                         |> SeqDict.values
                         |> List.reverse
-
-                postsViews : Html Msg
-                postsViews =
-                    TypedSvg.g [] (List.map (viewPost model.mouseState) postsList)
-
-                charactersViews : Html msg
-                charactersViews =
-                    viewCharacters postsList
               in
-              [ postsViews
-              , charactersViews
+              [ viewWordlines app.data.characters postsList
+              , TypedSvg.g
+                    [ TypedSvg.Attributes.id "posts" ]
+                    (List.map (viewPost model.mouseState) postsList)
               ]
                 |> TypedSvg.svg
                     [ Html.Attributes.style "overflow" "scroll"
@@ -544,8 +539,8 @@ view app _ model =
     }
 
 
-viewCharacters : List PostData -> Html msg
-viewCharacters posts =
+viewWordlines : SeqDict (Id CharacterId) CharacterSummary -> List PostData -> Html msg
+viewWordlines characters posts =
     posts
         |> List.concatMap
             (\{ boundingBox, annotations } ->
@@ -560,14 +555,15 @@ viewCharacters posts =
                         Html.text ""
 
                     ( id, _ ) :: _ ->
-                        pointsToSpline id (List.map Tuple.second t)
+                        pointsToSpline (SeqDict.get id characters) (List.map Tuple.second t)
             )
-        |> TypedSvg.g []
+        |> TypedSvg.g [ TypedSvg.Attributes.id "wordlines" ]
 
 
-pointsToSpline : Id CharacterId -> List (Point2d Meters {}) -> Html msg
-pointsToSpline id points =
+pointsToSpline : Maybe CharacterSummary -> List (Point2d Meters {}) -> Html msg
+pointsToSpline maybeCharacter points =
     let
+        path : String
         path =
             points
                 |> List.indexedMap
@@ -577,14 +573,31 @@ pointsToSpline id points =
                                 Point2d.toMeters p
                         in
                         if i == 0 then
-                            "M " ++ String.fromFloat x ++ " " ++ String.fromFloat y
+                            "M " ++ Round.round 0 (x * 100) ++ " " ++ Round.round 0 (y * 100)
 
                         else
-                            "L " ++ String.fromFloat x ++ " " ++ String.fromFloat y
+                            "L " ++ Round.round 0 (x * 100) ++ " " ++ Round.round 0 (y * 100)
                     )
                 |> String.join " "
+
+        characterAttrs =
+            case maybeCharacter of
+                Nothing ->
+                    []
+
+                Just character ->
+                    [ TypedSvg.Attributes.title character.name
+                    , TypedSvg.Core.attribute "stroke" (Oklch.toCssString character.color)
+                    ]
     in
-    TypedSvg.path [ TypedSvg.Attributes.path path ] []
+    TypedSvg.path
+        ([ TypedSvg.Attributes.d path
+         , TypedSvg.Attributes.fill PaintNone
+         , TypedSvg.Attributes.InMeters.strokeWidth (Length.centimeters 2)
+         ]
+            ++ characterAttrs
+        )
+        []
 
 
 annotationToPoint :
@@ -793,7 +806,7 @@ innerViewPost =
                     -- , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
                     ]
             ]
-                |> TypedSvg.g []
+                |> TypedSvg.g [ TypedSvg.Attributes.class [ "svg-post" ] ]
         )
 
 
