@@ -1,4 +1,4 @@
-module Glowfic.Utils exposing (allCharactersIds, annotationsCodec, boardAnnotationsFilepath, calculatePostAnnotations, postAnnotationsFilename, postAnnotationsFilepath, readAnnotationsFromFile)
+module Glowfic.Utils exposing (allCharactersIds, annotationsCodec, boardAnnotationsFilename, boardAnnotationsFilepath, calculatePostAnnotations, postAnnotationsFilename, postAnnotationsFilepath, readAnnotationsFromFile)
 
 import Annotation exposing (Annotation(..), MessageId(..))
 import BackendTask exposing (BackendTask)

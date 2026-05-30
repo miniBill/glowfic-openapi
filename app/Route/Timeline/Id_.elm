@@ -66,7 +66,8 @@ type alias ActionData =
 
 
 type alias Data =
-    { name : String
+    { boardId : Id BoardId
+    , name : String
     , initialPosts : SeqDict (Id PostId) PostData
     , characters : SeqDict (Id CharacterId) CharacterSummary
     }
@@ -102,6 +103,7 @@ type Msg
     = MouseDown PointerEvent
     | MouseMove PointerEvent
     | MouseUp PointerEvent
+    | DownloadPositions
 
 
 type alias PointerEvent =
@@ -219,6 +221,18 @@ update app _ msg model =
                 , Effect.none
                 )
 
+        DownloadPositions ->
+            ( model
+            , Effect.saveFile
+                { filename = Glowfic.Utils.boardAnnotationsFilename app.data.boardId
+                , mime = "application/json"
+                , content =
+                    model.posts
+                        |> SeqDict.map (\_ { boundingBox } -> boundingBox)
+                        |> Codec.encodeToString 0 positionsCodec
+                }
+            )
+
 
 pixelsToMeters : PointerEvent -> Quantity Float (Quantity.Rate Meters Pixels)
 pixelsToMeters event =
@@ -271,9 +285,9 @@ monad params =
                 in
                 Monad.succeed boardId
         )
-    <| \continuityId ->
-    Do.do (GlowficApi.Extra.getBoard continuityId) <| \board ->
-    Do.do (GlowficApi.Extra.getAllBoardsIdPosts continuityId) <| \results ->
+    <| \boardId ->
+    Do.do (GlowficApi.Extra.getBoard boardId) <| \board ->
+    Do.do (GlowficApi.Extra.getAllBoardsIdPosts boardId) <| \results ->
     -- Reverse posts so that 429s hurt us less
     Do.eachCount (results |> List.reverse |> List.Extra.removeWhen nonCanonical)
         (\post ->
@@ -319,7 +333,8 @@ monad params =
     let
         result : Data
         result =
-            { characters =
+            { boardId = boardId
+            , characters =
                 characters
                     |> Maybe.Extra.values
                     |> SeqDict.fromList
@@ -497,7 +512,9 @@ view app _ model =
     { title = app.data.name
     , body =
         [ Html.div
-            [ Html.Attributes.style "display" "flex"
+            [ Html.Attributes.style "display" "grid"
+            , Html.Attributes.style "grid-template-columns" "auto 1fr auto"
+            , Html.Attributes.style "grid-template-rows" "1fr auto"
             , Html.Attributes.style "color" "#f3f3f3"
             , Html.Attributes.style "background" "#211e2f"
             , Html.Attributes.style "gap" "8px"
@@ -505,7 +522,6 @@ view app _ model =
             , Html.Attributes.style "height" "100dvh"
             ]
             [ Html.Lazy.lazy viewPostsList app.data.initialPosts
-            , Html.div [ Html.Attributes.style "flex" "1 0 0" ] []
             , let
                 postsList : List PostData
                 postsList =
@@ -513,16 +529,17 @@ view app _ model =
                         |> SeqDict.values
                         |> List.reverse
               in
-              [ viewWordlines app.data.characters postsList
+              [ TypedSvg.g
+                    [ TypedSvg.Attributes.id "wordlines"
+                    ]
+                    (viewWordlines app.data.characters postsList)
               , TypedSvg.g
-                    [ TypedSvg.Attributes.id "posts" ]
+                    [ TypedSvg.Attributes.id "posts"
+                    ]
                     (List.map (viewPost model.mouseState) postsList)
               ]
                 |> TypedSvg.svg
-                    [ Html.Attributes.style "overflow" "scroll"
-                    , Html.Attributes.style "max-width" "100vw"
-                    , Html.Attributes.style "height" "calc(100dvh - 16px)"
-                    , TypedSvg.Attributes.InMeters.viewBox
+                    [ TypedSvg.Attributes.InMeters.viewBox
                         Quantity.zero
                         Quantity.zero
                         svgViewBoxSize.width
@@ -531,15 +548,26 @@ view app _ model =
                     , mouseEventWithSize "pointermove" MouseMove
                     , mouseEventWithSize "pointerup" MouseUp
                     , Html.Attributes.style "background" "#228"
+                    , Html.Attributes.style "overflow" "scroll"
                     ]
-            , Html.div [ Html.Attributes.style "flex" "1 0 0" ] []
+                |> List.singleton
+                |> Html.div
+                    [ Html.Attributes.style "max-height" "calc(100dvh - 80px)"
+                    , Html.Attributes.style "display" "flex"
+                    ]
             , Html.Lazy.lazy viewCharactersList app.data.characters
+            , Html.div [ Html.Attributes.style "padding" "8px 0" ]
+                [ Html.button
+                    [ Html.Events.onClick DownloadPositions
+                    ]
+                    [ Html.text "Download positions" ]
+                ]
             ]
         ]
     }
 
 
-viewWordlines : SeqDict (Id CharacterId) CharacterSummary -> List PostData -> Html msg
+viewWordlines : SeqDict (Id CharacterId) CharacterSummary -> List PostData -> List (Html msg)
 viewWordlines characters posts =
     posts
         |> List.concatMap
@@ -555,17 +583,24 @@ viewWordlines characters posts =
                         Html.text ""
 
                     ( id, _ ) :: _ ->
-                        pointsToSpline (SeqDict.get id characters) (List.map Tuple.second t)
+                        viewWordline (SeqDict.get id characters) (List.map Tuple.second t)
             )
-        |> TypedSvg.g [ TypedSvg.Attributes.id "wordlines" ]
 
 
-pointsToSpline : Maybe CharacterSummary -> List (Point2d Meters {}) -> Html msg
-pointsToSpline maybeCharacter points =
+viewWordline : Maybe CharacterSummary -> List (Point2d Meters {}) -> Html msg
+viewWordline maybeCharacter points =
     let
         path : String
         path =
             points
+                |> List.sortBy
+                    (\p ->
+                        let
+                            { x, y } =
+                                Point2d.toMeters p
+                        in
+                        ( y, x )
+                    )
                 |> List.indexedMap
                     (\i p ->
                         let
@@ -593,7 +628,7 @@ pointsToSpline maybeCharacter points =
     TypedSvg.path
         ([ TypedSvg.Attributes.d path
          , TypedSvg.Attributes.fill PaintNone
-         , TypedSvg.Attributes.InMeters.strokeWidth (Length.centimeters 2)
+         , TypedSvg.Attributes.InMeters.strokeWidth (Length.centimeters 1.5)
          ]
             ++ characterAttrs
         )
@@ -834,6 +869,7 @@ viewPostsList posts =
             , Html.Attributes.style "width" "200px"
             , Html.Attributes.style "overflow" "scroll"
             , Html.Attributes.style "height" "calc(100dvh - 16px)"
+            , Html.Attributes.style "grid-row" "1 / span 2"
             ]
 
 
@@ -886,7 +922,7 @@ viewPostForList { post, annotations } =
                 ""
           ]
             |> List.Extra.removeWhen String.isEmpty
-            |> String.join " "
+            |> String.join "\u{00A0}"
             |> Html.text
         ]
     , Route.link
@@ -910,6 +946,8 @@ viewCharactersList characters =
             , Html.Attributes.style "width" "200px"
             , Html.Attributes.style "overflow" "scroll"
             , Html.Attributes.style "height" "calc(100dvh - 16px)"
+            , Html.Attributes.style "grid-row" "1 / span 2"
+            , Html.Attributes.style "grid-column" "3"
             ]
 
 
