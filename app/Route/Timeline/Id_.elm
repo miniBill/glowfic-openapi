@@ -507,8 +507,8 @@ svgViewBoxSize :
     , height : Length
     }
 svgViewBoxSize =
-    { width = Length.meter
-    , height = Length.meters 2
+    { width = Length.meters 2
+    , height = Length.meters 4
     }
 
 
@@ -602,7 +602,7 @@ defaultBoundingBox i =
 
         gap : number
         gap =
-            1
+            10
     in
     BoundingBox2d.fromExtrema
         { minX = Length.centimeters ((defaultWidth + gap) * toFloat column)
