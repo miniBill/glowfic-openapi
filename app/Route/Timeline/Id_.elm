@@ -4,6 +4,7 @@ import Ansi.Color
 import BackendTask exposing (BackendTask)
 import BackendTask.File as File
 import BoundingBox2d exposing (BoundingBox2d)
+import BoundingBox2d.Extra
 import Codec exposing (Codec)
 import Color
 import Color.Oklch as Oklch exposing (Oklch)
@@ -47,7 +48,7 @@ import TypedSvg
 import TypedSvg.Attributes
 import TypedSvg.Attributes.InMeters
 import TypedSvg.Core
-import TypedSvg.Types exposing (DominantBaseline(..), LengthAdjust(..), Paint(..))
+import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), LengthAdjust(..), Paint(..))
 import Url exposing (Url)
 import UrlPath exposing (UrlPath)
 import Vector2d exposing (Vector2d)
@@ -144,6 +145,7 @@ update app _ msg model =
             in
             case
                 postsAndPositions app model
+                    |> List.reverse
                     |> List.Extra.findMap
                         (\( { post }, boundingBox ) ->
                             if BoundingBox2d.contains initialPosition boundingBox then
@@ -607,32 +609,59 @@ viewPost mouseState ( d, boundingBox ) =
         ( w, h ) =
             BoundingBox2d.dimensions boundingBox
 
-        id : String
-        id =
-            "p" ++ Id.toString post.id
+        cx =
+            Quantity.plus x (Quantity.half (BoundingBox2d.Extra.width defaultBoundingBox))
+
+        cy =
+            Quantity.plus y (Quantity.half (BoundingBox2d.Extra.height defaultBoundingBox))
+
+        lines : List String
+        lines =
+            post.subject
+                |> String.Extra.softWrap 14
+                |> String.lines
+
+        linesCount : Int
+        linesCount =
+            List.length lines
+
+        fontSize =
+            Length.centimeters 2
     in
     [ TypedSvg.rect
         [ TypedSvg.Attributes.InMeters.x x
         , TypedSvg.Attributes.InMeters.y y
         , TypedSvg.Attributes.InMeters.width w
         , TypedSvg.Attributes.InMeters.height h
-        , TypedSvg.Attributes.id id
         ]
         []
-    , TypedSvg.text_
-        [ TypedSvg.Attributes.dominantBaseline DominantBaselineHanging
-        , TypedSvg.Attributes.fill (Paint Color.white)
+    , lines
+        |> List.indexedMap
+            (\i line ->
+                TypedSvg.tspan
+                    [ TypedSvg.Attributes.InMeters.x cx
+                    , TypedSvg.Attributes.InMeters.y
+                        (cy
+                            |> Quantity.plus
+                                (fontSize |> Quantity.multiplyBy (toFloat i - toFloat (linesCount - 1) / 2))
+                        )
+                    ]
+                    [ TypedSvg.Core.text line ]
+            )
+        |> TypedSvg.text_
+            [ TypedSvg.Attributes.fill (Paint Color.white)
+            , TypedSvg.Attributes.InMeters.fontSize fontSize
 
-        -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
-        -- , TypedSvg.Core.attribute "shape-padding" "8px"
-        , TypedSvg.Attributes.InMeters.x x
-        , TypedSvg.Attributes.InMeters.y y
+            -- , TypedSvg.Core.attribute "shape-inside" ("url(#" ++ id ++ ")")
+            -- , TypedSvg.Core.attribute "shape-padding" "8px"
+            , TypedSvg.Attributes.InMeters.x cx
+            , TypedSvg.Attributes.InMeters.y cy
+            , TypedSvg.Attributes.dominantBaseline DominantBaselineMiddle
+            , TypedSvg.Attributes.textAnchor AnchorMiddle
 
-        -- , TypedSvg.Attributes.textAnchor AnchorMiddle
-        , TypedSvg.Attributes.InMeters.textLength w
-        , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
-        ]
-        [ TypedSvg.Core.text post.subject ]
+            -- , TypedSvg.Attributes.InMeters.textLength w
+            -- , TypedSvg.Attributes.lengthAdjust LengthAdjustSpacingAndGlyphs
+            ]
     ]
 
 

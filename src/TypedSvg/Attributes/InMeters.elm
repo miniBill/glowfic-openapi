@@ -1,4 +1,4 @@
-module TypedSvg.Attributes.InMeters exposing (..)
+module TypedSvg.Attributes.InMeters exposing (dx, dy, fontSize, height, textLength, viewBox, width, x, y)
 
 import Length exposing (Length)
 import TypedSvg.Attributes
@@ -38,3 +38,18 @@ height v =
 textLength : Length -> Attribute msg
 textLength v =
     TypedSvg.Attributes.textLength (TypedSvg.Types.Num (Length.inCentimeters v))
+
+
+dx : Length -> Attribute msg
+dx v =
+    TypedSvg.Attributes.dx (TypedSvg.Types.Num (Length.inCentimeters v))
+
+
+dy : Length -> Attribute msg
+dy v =
+    TypedSvg.Attributes.dy (TypedSvg.Types.Num (Length.inCentimeters v))
+
+
+fontSize : Length -> Attribute msg
+fontSize v =
+    TypedSvg.Attributes.fontSize (TypedSvg.Types.Num (Length.inCentimeters v))
