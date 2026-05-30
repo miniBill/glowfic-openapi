@@ -143,6 +143,7 @@ update app _ msg model =
                 initialPosition =
                     event.offsetPosition
                         |> Point2d.at (pixelsToMeters event)
+                        |> Debug.log "initialPosition"
             in
             case
                 postsAndPositions app model
@@ -532,19 +533,24 @@ eventDecoder =
         pixels =
             Json.Decode.map Pixels.pixels Json.Decode.float
     in
-    Json.Decode.map4
-        (\x y width height ->
-            { offsetPosition = Point2d.xy x y
+    Json.Decode.map6
+        (\clientX clientY svgX svgY svgWidth svgHeight ->
+            { offsetPosition =
+                Point2d.xy
+                    (clientX |> Quantity.minus svgX)
+                    (clientY |> Quantity.minus svgY)
             , elementSize =
-                { width = width
-                , height = height
+                { width = svgWidth
+                , height = svgHeight
                 }
             }
         )
-        (Json.Decode.field "offsetX" pixels)
-        (Json.Decode.field "offsetY" pixels)
-        (Json.Decode.at [ "currentTarget", "clientWidth" ] pixels)
-        (Json.Decode.at [ "currentTarget", "clientHeight" ] pixels)
+        (Json.Decode.field "clientX" pixels)
+        (Json.Decode.field "clientY" pixels)
+        (Json.Decode.at [ "currentTarget", "__boundingBox", "x" ] pixels)
+        (Json.Decode.at [ "currentTarget", "__boundingBox", "y" ] pixels)
+        (Json.Decode.at [ "currentTarget", "__boundingBox", "width" ] pixels)
+        (Json.Decode.at [ "currentTarget", "__boundingBox", "height" ] pixels)
 
 
 postsAndPositions :

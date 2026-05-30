@@ -5,6 +5,11 @@ type ElmPagesInit = {
 
 const config: ElmPagesInit = {
     load: async function (elmLoaded) {
+        Object.defineProperty(Element.prototype, "__boundingBox", {
+            get() {
+                return this.getBoundingClientRect();
+            },
+        });
         await elmLoaded;
     },
     flags: function () {
